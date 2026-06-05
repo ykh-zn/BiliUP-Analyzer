@@ -1,419 +1,354 @@
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-#from selenium.webdriver.edge.service import Service
-#from webdriver_manager.microsoft import EdgeChromiumDriverManager
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-import random
-import time
+import requests
 import json
-import re
+import time
+import random
+import hashlib
+import urllib.parse
 import os
 import argparse
-#==================================UID & url部分===============================
+from datetime import datetime
+
+# ============================== 参数解析 ==============================
 parser = argparse.ArgumentParser()
 parser.add_argument('--uid', type=str, default='527299525', help='B站UP主UID')
 args = parser.parse_args()
 UID = args.uid
-url = f"https://space.bilibili.com/{UID}/upload/video"   #获取关注数 粉丝数 点赞量 播放量
-#=================================创建文件目录==================================
-data_dir_path = os.path.join('.','data','raw',f'UID_{UID}')
-os.makedirs(data_dir_path,exist_ok=True)
-#=================================浏览器配置部分===============================
-options = webdriver.EdgeOptions()
-options.page_load_strategy = 'eager'
-options.add_argument("--disable-blink-features=AutomationControlled")
-options.add_experimental_option("excludeSwitches", ["enable-automation"])
-options.add_experimental_option('useAutomationExtension', False)
-options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
-#options.add_argument("--start-maximized")  # 最大化窗口，更像真人
-options.add_argument("--no-sandbox")      # 必备权限
-options.add_argument("--disable-dev-shm-usage")
-options.add_argument("--disable-infobars")
-#关闭图片视频加载等（可选，提速）
-#options.add_argument("--blink-settings=imagesEnabled=false")
-options.add_argument("--disable-images")
-options.add_argument("--disable-video")
-driver = webdriver.Edge(
-    #service = Service(EdgeChromiumDriverManager().install()),
-    options = options,
-) 
-#反爬处理
-driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-    "source": """
-        Object.defineProperty(navigator, 'webdriver', {
-            get: () => undefined
-        })
-    """
-})
-#设置等待器
-wait = WebDriverWait(driver,3)
-wait_login = WebDriverWait(driver,60)
-#设置尺寸和位置
-driver.set_window_size(1000,800)
-driver.set_window_position(700, 0)
-start_time = time.time() #开始时间
-#模拟打开B站 获取cookies
-print('登录中..............')
-driver.get("https://www.bilibili.com")
-cookies_path = os.path.join(".",'data','cookies.json')
-try:
-    #尝试读取cookies数据文件
-    with open(cookies_path,mode='r',encoding='utf-8') as c:
-        cookies_list = json.load(c)
-    #检查cookies是否为空
-    if not cookies_list:
-        cookies_flag = False
-    else:
-        #将cookies带入driver -----如果文件是空的或者被损坏或者过期会报错然后进行登录操作
-        for item in cookies_list:
-            driver.add_cookie(item)
-        #标记存在cookies数据
-        cookies_flag = True
-except:  #没有cookies文件 需要登录储存
-    cookies_flag = False
 
-if not cookies_flag:  #进行模拟登录操作
-    print('请在浏览器进行登录,如登录后无反应请手动刷新页面')
-    #等待成功登录----设置了60s内登录
-    driver.set_window_position(0,0)
+# ============================== 路径配置 ==============================
+data_dir_path = os.path.join('.', 'data', 'raw', f'UID_{UID}')
+os.makedirs(data_dir_path, exist_ok=True)
+cookies_path = os.path.join('.', 'data', 'cookies.json')
+
+# ============================== 请求配置 ==============================
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+    'Referer': 'https://www.bilibili.com',
+}
+session = requests.Session()
+session.headers.update(HEADERS)
+
+# ============================== WBI 签名 ==============================
+MIXIN_KEY_ENC_TAB = [
+    46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35,
+    27, 43, 5, 49, 33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13,
+    37, 48, 7, 16, 24, 55, 40, 61, 26, 17, 0, 1, 60, 51, 30, 4,
+    22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 34, 44, 52,
+]
+
+
+def get_mixin_key(orig: str) -> str:
+    return ''.join([orig[i] for i in MIXIN_KEY_ENC_TAB])[:32]
+
+
+def enc_wbi(params: dict, img_key: str, sub_key: str) -> dict:
+    mixin_key = get_mixin_key(img_key + sub_key)
+    params['wts'] = round(time.time())
+    params = dict(sorted(params.items()))
+    params = {
+        k: ''.join(filter(lambda ch: ch not in "!'()*", str(v)))
+        for k, v in params.items()
+    }
+    query = urllib.parse.urlencode(params)
+    params['w_rid'] = hashlib.md5((query + mixin_key).encode()).hexdigest()
+    return params
+
+
+def get_wbi_keys():
+    """从 nav API 获取 img_key 和 sub_key"""
+    resp = session.get('https://api.bilibili.com/x/web-interface/nav').json()
+    img_url = resp['data']['wbi_img']['img_url']
+    sub_url = resp['data']['wbi_img']['sub_url']
+    img_key = img_url.split('/')[-1].split('.')[0]
+    sub_key = sub_url.split('/')[-1].split('.')[0]
+    return img_key, sub_key
+
+
+# ============================== 工具函数 ==============================
+def format_duration(seconds):
+    """秒数转 MM:SS 或 HH:MM:SS"""
+    if not seconds:
+        return ''
+    seconds = int(seconds)
+    h, remainder = divmod(seconds, 3600)
+    m, s = divmod(remainder, 60)
+    if h > 0:
+        return f'{h}:{m:02d}:{s:02d}'
+    return f'{m}:{s:02d}'
+
+
+def format_time(timestamp):
+    """Unix 时间戳转可读时间"""
+    if not timestamp:
+        return ''
+    return datetime.fromtimestamp(int(timestamp)).strftime('%Y-%m-%d %H:%M:%S')
+
+
+# ============================== 登录 ==============================
+start_time = time.time()
+print('检查登录状态...')
+
+
+def load_cookies():
+    """加载 cookies 并验证"""
+    if not os.path.exists(cookies_path):
+        return False
     try:
-        wait_login.until(
+        with open(cookies_path, 'r', encoding='utf-8') as f:
+            cookies_list = json.load(f)
+        if not cookies_list:
+            return False
+        for item in cookies_list:
+            session.cookies.set(item['name'], item['value'],
+                                domain=item.get('domain', '.bilibili.com'))
+        # 验证登录
+        resp = session.get('https://api.bilibili.com/x/web-interface/nav').json()
+        if resp['code'] == 0 and resp['data'].get('isLogin'):
+            print(f"登录有效，用户: {resp['data']['uname']}")
+            return True
+        return False
+    except Exception:
+        return False
+
+
+def selenium_login():
+    """Selenium 扫码登录获取 cookies"""
+    from selenium import webdriver
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+
+    print('请在浏览器进行登录，如登录后无反应请手动刷新页面')
+
+    options = webdriver.EdgeOptions()
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-infobars")
+
+    driver = webdriver.Edge(options=options)
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+        "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+    })
+    driver.set_window_size(1000, 800)
+    driver.set_window_position(0, 0)
+
+    driver.get("https://www.bilibili.com")
+
+    try:
+        WebDriverWait(driver, 60).until(
             EC.invisibility_of_element_located(
-                (By.XPATH,'//*[@id="app"]//div[@class="bili-header__bar"]//ul[@class="right-entry"]//div[@class="header-login-entry"]')
-            )
-        )  #这里是根据登录之后该元素会消失来写
-    except:
-        raise TimeoutError('登录超时请稍后重试')
-
-    #储存cookies
-    cookies_list = driver.get_cookies()
-    with open(cookies_path,mode='w',encoding='utf-8') as c:
-        json.dump(cookies_list,c)
-    print('登录成功,已保存对应Cookies信息以便下次操作')
-
-driver.set_window_position(700, 0)
-#关闭图片渲染加速爬取------放在这里是为了登录时候二维码能读取稳定
-driver.options.add_argument("--blink-settings=imagesEnabled=false")   
-
-#===================================basic_data=========================================
-driver.get(url)
-nickname = wait.until(
-    EC.presence_of_element_located(
-        (By.XPATH,'.//div[@class="nickname"]')
-    )
-).text #获取昵称
-basic_data_key_raw = driver.find_elements(
-    By.XPATH,
-    '//div[@class="nav-bar space-navbar"]//span[@class="nav-statistics__item-text"]'
-) #获取key名
-basic_data_value_raw = driver.find_elements(
-    By.XPATH,
-    '//div[@class="nav-bar space-navbar"]//span[@class="nav-statistics__item-num"]'
-) #获取value
-# 打印结果 关注数 粉丝量 点赞数 播放量  以及数据简单处理写入json文档
-basic_data_json = [{"UID":UID,"昵称":nickname}]
-print('=================================================================')
-print('-------------------基础数据展示-----------------------------------')
-print(f'UID:{UID}')
-print(f'昵称:{nickname}')
-for k,v in zip(basic_data_key_raw,basic_data_value_raw):  #数据展示+数据处理(保留纯数字字典格式)
-    #最原始文本
-    k = k.text
-    v = v.get_attribute('title')
-    #数据处理
-    v_done = re.search(r'[\d,]+$',v).group().replace(',','') if re.search(r'[\d,]+',v) else '未知'
-    basic_data_json[0][k] = v_done
-    #数据展示----展示最原始文本
-    print(f'{k}:{v}')
-print('------------------------------------------------------------------')
-print('===================================================================')
-#编辑数据准备写入文档
-basic_data_path = os.path.join(data_dir_path,'basic_data.json')
-with open(basic_data_path,mode='w',encoding='utf-8') as f:
-    json.dump(basic_data_json,f,ensure_ascii=False,indent=4)
-
-print(f'基础数据保存成功,路径为:{basic_data_path}')
-
-#==========================================video_data=========================================
-#=======换页部分
-#这里是为了第一次要有页面出现
-print('爬取视频链接中.........................................................')
-# 尝试多种选择器适配不同版本的B站页面结构
-VIDEO_CARD_SELECTORS = [
-    './/div[@class="video-list grid-mode"]/div[@class="upload-video-card grid-mode"]',
-    './/div[contains(@class,"video-list")]//div[contains(@class,"video-card")]',
-    './/div[contains(@class,"upload-video-card")]',
-    './/div[@id="submit-video-list"]//li[contains(@class,"small-item")]',
-]
-VIDEO_LINK_SELECTORS = [
-    ".//div[@class='bili-video-card__cover']/a[@class='bili-cover-card']",
-    ".//a[contains(@class,'bili-cover-card')]",
-    ".//a[contains(@href,'/video/BV')]",
-    ".//a[contains(@href,'video/')]",
-]
-
-def find_video_cards():
-    for selector in VIDEO_CARD_SELECTORS:
-        elements = driver.find_elements(By.XPATH, selector)
-        if elements:
-            print(f"使用选择器: {selector}")
-            return elements, selector
-    return [], None
-
-def find_video_link(element):
-    for selector in VIDEO_LINK_SELECTORS:
-        try:
-            link = element.find_element(By.XPATH, selector).get_attribute('href')
-            if link:
-                return link
-        except:
-            continue
-    return None
-
-# 视频简介选择器
-DESC_SELECTORS = [
-    './/div[@class="basic-desc-info"]//span[@class="desc-info-text"]',
-    './/div[contains(@class,"desc-info")]//span',
-    './/div[@class="video-desc"]//span',
-    './/span[contains(@class,"desc")]',
-]
-
-# 评论数选择器
-COMMENT_SELECTORS = [
-    '//span[@class="reply-box-wrap"]',
-    '//*[contains(@class,"info-text") or contains(@class,"reply-count")]',
-    '//div[@id="comment"]//span',
-]
-
-# 视频时长选择器
-DURATION_SELECTORS = [
-    './/span[contains(@class,"duration")]',
-    './/span[contains(@class,"bilibili-player-video-time-total")]',
-    './/div[@class="video-info-meta"]//span[contains(@class,"time")]',
-    './/div[contains(@class,"player-header")]//span[contains(@class,"time")]',
-]
-
-# 视频标签选择器
-TAG_SELECTORS = [
-    './/a[@class="tag-link"]',
-    './/ul[contains(@class,"tag-area")]//a',
-    './/div[contains(@class,"tag")]//a',
-    './/span[contains(@class,"tag")]//a',
-]
-
-def find_element_by_selectors(selectors, timeout=3, numeric_only=False):
-    """尝试多种选择器获取元素文本，跳过空文本元素"""
-    for selector in selectors:
-        try:
-            elements = WebDriverWait(driver, timeout).until(
-                EC.presence_of_all_elements_located((By.XPATH, selector))
-            )
-            for element in elements:
-                text = element.text.strip()
-                if text:
-                    # 如果需要数字，过滤掉非数字文本
-                    if numeric_only and not any(c.isdigit() for c in text):
-                        continue
-                    return text
-        except:
-            continue
-    return ''
-
-def find_elements_by_selectors(selectors, timeout=3):
-    """尝试多种选择器获取多个元素文本，返回列表"""
-    for selector in selectors:
-        try:
-            elements = WebDriverWait(driver, timeout).until(
-                EC.presence_of_all_elements_located((By.XPATH, selector))
-            )
-            texts = [el.text.strip() for el in elements if el.text.strip()]
-            if texts:
-                return texts
-        except:
-            continue
-    return []
-
-while True:
-    video_data_raw, _ = find_video_cards()
-    if video_data_raw:
-        break
-    driver.refresh()
-    time.sleep(5)
-
-video_href_list=[]
-while True:
-    #首先获取视频原始节点数据
-    #初始化变量
-    video_data_raw = []
-    video_data_raw, card_selector = find_video_cards()
-    if not video_data_raw:
-        video_data_raw = wait.until(
-            EC.presence_of_all_elements_located(
-                (By.XPATH, card_selector or VIDEO_CARD_SELECTORS[0])
+                (By.XPATH, '//*[@id="app"]//div[@class="bili-header__bar"]//ul[@class="right-entry"]//div[@class="header-login-entry"]')
             )
         )
-    button1 = driver.find_elements(
-        By.XPATH,
-        "//button[contains(@class,'vui_pagenation') and normalize-space()='上一页']")
-    button2 = driver.find_elements(
-        By.XPATH,
-        "//button[contains(@class,'vui_pagenation') and normalize-space()='下一页']")
-    #获取不到节点进行 上一页->下一页操作
-    while not video_data_raw and button1 and button2:
-        if not button1[0].text == "上一页":
-            driver.refresh()  #这是针对第一页操作
-        button1[0].click()
-        time.sleep(1)
-        button2[0].click()
-        time.sleep(1)
-        video_data_raw, card_selector = find_video_cards()
-        if not video_data_raw:
-            video_data_raw = wait.until(
-                EC.presence_of_all_elements_located(
-                    (By.XPATH, card_selector or VIDEO_CARD_SELECTORS[0])
-                )
-            )
-    #处理视频节点 -> 转化为链接
-    for ele in video_data_raw:
-    #链接数据处理
-        url_single_video = find_video_link(ele)
-        if not url_single_video:
-            print(f"警告: 无法获取视频链接，跳过该视频")
-            continue
-        if not url_single_video.startswith('https:'):
-            url_single_video = os.path.join('https:',url_single_video)
-        #处理完毕后加到列表
-        video_href_list.append(url_single_video)
+    except Exception:
+        driver.close()
+        raise TimeoutError('登录超时请稍后重试')
 
-    #换页操作
-    if button2 and button2[0].text == '下一页':  #还有下一页就一直跳转直到没
-        button2[0].click()
-        time.sleep(1) #跳转页面等待渲染
-    else:
-        break
+    # 提取 cookies
+    selenium_cookies = driver.get_cookies()
+    driver.close()
 
-#这里看看能不能改为多线程   已得到视频所有链接 video_href_list
-video_data_json = []     #用于存放各个视频的数据
-num_all_video = len(video_href_list)
-print(f'一共抓取到{num_all_video}个视频,即将进行数据爬取')
-error_time = 0 #用于记录失败条数
-for idx,href in enumerate(video_href_list,start=1):
+    # 保存到文件
+    with open(cookies_path, 'w', encoding='utf-8') as f:
+        json.dump(selenium_cookies, f, ensure_ascii=False, indent=4)
+    print('登录成功，已保存 Cookies')
+
+    # 加载到 session
+    for item in selenium_cookies:
+        session.cookies.set(item['name'], item['value'],
+                            domain=item.get('domain', '.bilibili.com'))
+
+
+if not load_cookies():
+    selenium_login()
+
+# ============================== 获取 WBI 密钥 ==============================
+print('获取 WBI 密钥...')
+img_key, sub_key = get_wbi_keys()
+
+# ============================== 视频列表 ==============================
+print('获取视频列表...')
+
+
+def fetch_video_list(uid, img_key, sub_key):
+    """分页获取所有视频 bvid 列表"""
+    video_list = []
+    pn = 1
+    ps = 50
+
+    while True:
+        params = enc_wbi({
+            'mid': uid,
+            'ps': ps,
+            'pn': pn,
+            'order': 'pubdate',
+            'tid': 0,
+        }, img_key, sub_key)
+
+        resp = session.get(
+            'https://api.bilibili.com/x/space/wbi/arc/search',
+            params=params
+        ).json()
+
+        if resp['code'] != 0:
+            print(f"获取视频列表失败: {resp['message']} (code: {resp['code']})")
+            break
+
+        vlist = resp['data']['list']['vlist']
+        total = resp['data']['page']['count']
+
+        if not vlist:
+            break
+
+        for v in vlist:
+            video_list.append({
+                'bvid': v['bvid'],
+                'title': v['title'],
+            })
+
+        print(f"  第 {pn} 页，已获取 {len(video_list)}/{total} 个视频")
+
+        if len(video_list) >= total:
+            break
+
+        pn += 1
+        time.sleep(random.uniform(0.3, 0.8))
+
+    return video_list
+
+
+video_list = fetch_video_list(UID, img_key, sub_key)
+num_all_video = len(video_list)
+print(f'共获取到 {num_all_video} 个视频，开始爬取详情...')
+
+# ============================== 视频详情（新 API） ==============================
+video_data_json = []
+raw_data_list = []
+error_time = 0
+
+for idx, video in enumerate(video_list, start=1):
+    bvid = video['bvid']
     try:
-        print(f'爬取第{idx}个视频数据中..........')
-        #进入单个视频进行数据爬取
-        '''爬取 标题 播放量 弹幕数 点赞数 硬币数 转发量 分享量 评论数 '''
-        driver.get(href)
-        driver.execute_script(f"window.scrollTo(0, {random.randint(1000,3000)});") #滚动页面
-        #标题
-        title = wait.until(
-            EC.presence_of_element_located(
-                (By.XPATH, ".//div[@class='video-info-title']//h1")
-            )
-        ).text
-        #视频简介（多选择器容错）
-        desc = find_element_by_selectors(DESC_SELECTORS, timeout=2)
-        #播放量
-        view_count = wait.until(
-            EC.presence_of_element_located(
-                (By.XPATH, './/div[@class="video-info-meta"]//div[@class="view-text"]')
-            )
-        ).text
-        #弹幕
-        dm_count = wait.until(
-            EC.presence_of_element_located(
-                (By.XPATH,'.//div[@class="video-info-meta"]//div[@class="dm-text"]')
-            )
-        ).text
-        #发布(更改)时间
-        pubdate = wait.until(
-            EC.presence_of_element_located(
-                (By.XPATH,
-                './/div[@class="video-info-meta"]//div[@class="pubdate-ip-text"]')
-            )
-        ).text
-        #点赞量
-        like_count = wait.until(
-            EC.presence_of_element_located(
-                (By.XPATH,'.//span[@class="video-like-info video-toolbar-item-text"]')
-            )
-        ).text
-        if like_count == '点赞':
-            like_count = '0'
-        #投币数
-        coin_count = wait.until(
-            EC.presence_of_element_located(
-                (By.XPATH, './/span[@class="video-coin-info video-toolbar-item-text"]')
-            )
-        ).text
-        if coin_count == '投币':
-            coin_count = '0'
-        #收藏量
-        fav_count = wait.until(
-            EC.presence_of_element_located(
-                (By.XPATH,'.//span[@class="video-fav-info video-toolbar-item-text"]')
-            )
-        ).text
-        if fav_count == '收藏':
-            fav_count = '0'
-        #转发量
-        share_count = wait.until(
-            EC.presence_of_element_located(
-                (By.XPATH,'.//div[@class="video-share-info video-toolbar-item-text"]')
-            )
-        ).text
-        if share_count == '分享':
-            share_count = '0'
-        #评论数（多选择器容错，只匹配包含数字的文本）
-        com_count = find_element_by_selectors(COMMENT_SELECTORS, timeout=2, numeric_only=True)
-        if not com_count:
-            com_count = '0'
-        #视频时长（多选择器容错）
-        duration = find_element_by_selectors(DURATION_SELECTORS, timeout=2)
-        #视频标签（获取多个标签，逗号分隔）
-        tags_list = find_elements_by_selectors(TAG_SELECTORS, timeout=2)
-        tags = ','.join(tags_list) if tags_list else ''
+        print(f'爬取第 {idx}/{num_all_video} 个视频: {bvid}...')
+
+        # 使用 view/detail API（一个请求拿到所有数据）
+        resp = session.get(
+            f'https://api.bilibili.com/x/web-interface/view/detail?bvid={bvid}'
+        ).json()
+
+        if resp['code'] != 0:
+            print(f"  失败: {resp['message']}")
+            error_time += 1
+            continue
+
+        detail = resp['data']
+        view = detail['View']
+        stat = view['stat']
+        card = detail.get('Card', {})
+        tags_list = detail.get('Tags', [])
+        related = detail.get('Related', [])
+        reply = detail.get('Reply', {})
+        emergency = detail.get('emergency', {})
+
+        # 第一个视频时保存 UP 主基础数据（从 Card 获取，不需要额外请求）
+        if idx == 1:
+            card_info = card.get('card', {})
+            basic_data_json = [{
+                'UID': UID,
+                '昵称': card_info.get('name', ''),
+                '签名': card_info.get('sign', ''),
+                '等级': card_info.get('level_info', {}).get('current_level', 0),
+                '粉丝数': str(card.get('follower', 0)),
+                '关注数': str(card_info.get('attention', 0)),
+                '获赞数': str(card.get('like_num', 0)),
+                '作品数': str(card.get('archive_count', 0)),
+                '文章数': str(card.get('article_count', 0)),
+            }]
+            basic_data_path = os.path.join(data_dir_path, 'basic_data.json')
+            with open(basic_data_path, 'w', encoding='utf-8') as f:
+                json.dump(basic_data_json, f, ensure_ascii=False, indent=4)
+
+            print('=' * 50)
+            print(f"UID:{UID}")
+            print(f"昵称:{basic_data_json[0]['昵称']}")
+            print(f"粉丝数:{int(basic_data_json[0]['粉丝数']):,}")
+            print(f"获赞数:{int(basic_data_json[0]['获赞数']):,}")
+            print(f"作品数:{basic_data_json[0]['作品数']}")
+            print('=' * 50)
+            print(f'基础数据保存成功: {basic_data_path}')
+
+        # 标签
+        tags = ','.join([t['tag_name'] for t in tags_list]) if tags_list else ''
+
+        # 格式化时长和发布时间
+        duration = format_duration(view.get('duration', 0))
+        pubdate = format_time(view.get('pubdate', 0))
+
+        # 保存到 video_data.json（与看板兼容的格式）
+        video_info = {
+            '序号': idx,
+            '标题': view['title'],
+            '简介': view.get('desc', ''),
+            '视频时长': duration,
+            '标签': tags,
+            '播放量': str(stat['view']),
+            '弹幕数': str(stat['danmaku']),
+            '发布(更改)时间': pubdate,
+            '点赞量': str(stat['like']),
+            '投币数': str(stat['coin']),
+            '收藏量': str(stat['favorite']),
+            '转发量': str(stat['share']),
+            '评论数': str(stat['reply']),
+            '视频链接': f'https://www.bilibili.com/video/{bvid}',
+        }
+        video_data_json.append(video_info)
+
+        # 保存完整原始数据（所有字段）
+        raw_entry = {
+            'bvid': bvid,
+            'View': view,
+            'Card': card,
+            'Tags': tags_list,
+            'Related': [{'title': r['title'], 'bvid': r['bvid'],
+                         'view': r['stat']['view'], 'like': r['stat']['like']}
+                        for r in related],
+            'Reply': reply,
+            'emergency': emergency,
+        }
+        raw_data_list.append(raw_entry)
+
+        time.sleep(random.uniform(0.3, 0.8))
+
     except Exception as e:
-        print(f'第{idx}条视频爬取失败,原因:超时或者视频结构变化')
-        print(f'对应链接为{href}')
-        error_time+=1
+        print(f'第 {idx} 条视频爬取失败: {e}')
+        error_time += 1
         continue
-    #数据整理和写入
-    data = {
-    '序号':idx,
-    '标题':title,
-    '简介':desc,
-    '视频时长':duration,
-    '标签':tags,
-    '播放量':view_count,
-    '弹幕数':dm_count,
-    '发布(更改)时间':pubdate,
-    '点赞量':like_count,
-    '投币数':coin_count,
-    '收藏量':fav_count,
-    '转发量':share_count,
-    '评论数':com_count,
-    '视频链接':href
-    }
-    video_data_json.append(data)
 
-#写入video_data
-video_data_path = os.path.join(data_dir_path,"video_data.json")
-if video_data_json: #有数据 再说明
-    with open(video_data_path,mode='w',encoding='utf-8') as f:
-        json.dump(video_data_json,f,ensure_ascii=False,indent=4)
-    #保存成功输出路径地址
-    print(f'视频数据保存成功,路径为:{video_data_path}')
-    num_video_success = len(video_data_json)
-    print(f'成功爬取视频数据数:{num_video_success}')
-    if error_time!=0:
-        print(f'爬取失败视频数:{error_time}')
-        print(f'爬取成功率:{num_video_success/num_all_video*100:.2f}%')
-    else:
-        print(f'爬取成功率:100.00%')
+# ============================== 保存数据 ==============================
+# 保存 video_data.json（看板读取）
+video_data_path = os.path.join(data_dir_path, 'video_data.json')
+if video_data_json:
+    with open(video_data_path, 'w', encoding='utf-8') as f:
+        json.dump(video_data_json, f, ensure_ascii=False, indent=4)
+    print(f'视频数据保存成功: {video_data_path}')
+
+# 保存 raw_data.json（完整原始数据）
+raw_data_path = os.path.join(data_dir_path, 'raw_data.json')
+if raw_data_list:
+    with open(raw_data_path, 'w', encoding='utf-8') as f:
+        json.dump(raw_data_list, f, ensure_ascii=False, indent=4)
+    print(f'原始数据保存成功: {raw_data_path}')
+
+# 统计
+num_success = len(video_data_json)
+print(f'成功爬取: {num_success}/{num_all_video}')
+if error_time:
+    print(f'失败: {error_time}')
+    print(f'成功率: {num_success / num_all_video * 100:.2f}%')
 else:
-    print("爬取失败,请检查网络后再试")
+    print('成功率: 100.00%')
 
-driver.close()
 end_time = time.time()
-print(f'总用时:{end_time-start_time:.3f}s')
+print(f'总用时: {end_time - start_time:.1f}s')
