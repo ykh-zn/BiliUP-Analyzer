@@ -7,6 +7,7 @@ import json
 import re
 import os
 import subprocess
+import sys
 import time
 from collections import Counter
 from wordcloud import WordCloud
@@ -487,7 +488,7 @@ if st.session_state.get('crawling'):
     log_lines = []
     try:
         proc = subprocess.Popen(
-            ['python', script_path, '--uid', st.session_state['crawl_uid']],
+            [sys.executable, script_path, '--uid', st.session_state['crawl_uid']],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, encoding='utf-8', errors='replace',
             cwd=project_root,

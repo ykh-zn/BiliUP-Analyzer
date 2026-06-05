@@ -21,7 +21,7 @@ data_dir_path = os.path.join('.','data','raw',f'UID_{UID}')
 os.makedirs(data_dir_path,exist_ok=True)
 #=================================浏览器配置部分===============================
 options = webdriver.EdgeOptions()
-#options.page_load_strategy = 'eager'
+options.page_load_strategy = 'eager'
 options.add_argument("--disable-blink-features=AutomationControlled")
 options.add_experimental_option("excludeSwitches", ["enable-automation"])
 options.add_experimental_option('useAutomationExtension', False)
@@ -47,7 +47,7 @@ driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
     """
 })
 #设置等待器
-wait = WebDriverWait(driver,5)
+wait = WebDriverWait(driver,3)
 wait_login = WebDriverWait(driver,60)
 #设置尺寸和位置
 driver.set_window_size(1000,800)
@@ -97,7 +97,6 @@ driver.set_window_position(700, 0)
 driver.options.add_argument("--blink-settings=imagesEnabled=false")   
 
 #===================================basic_data=========================================
-driver.refresh()
 driver.get(url)
 nickname = wait.until(
     EC.presence_of_element_located(
@@ -290,7 +289,7 @@ while True:
     #换页操作
     if button2 and button2[0].text == '下一页':  #还有下一页就一直跳转直到没
         button2[0].click()
-        time.sleep(2) #跳转页面等待渲染
+        time.sleep(1) #跳转页面等待渲染
     else:
         break
 
@@ -369,8 +368,8 @@ for idx,href in enumerate(video_href_list,start=1):
         com_count = find_element_by_selectors(COMMENT_SELECTORS, timeout=2, numeric_only=True)
         if not com_count:
             com_count = '0'
-        #视频时长（多选择器容错，增加超时等待播放器加载）
-        duration = find_element_by_selectors(DURATION_SELECTORS, timeout=5)
+        #视频时长（多选择器容错）
+        duration = find_element_by_selectors(DURATION_SELECTORS, timeout=2)
         #视频标签（获取多个标签，逗号分隔）
         tags_list = find_elements_by_selectors(TAG_SELECTORS, timeout=2)
         tags = ','.join(tags_list) if tags_list else ''
