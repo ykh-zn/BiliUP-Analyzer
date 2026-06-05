@@ -252,9 +252,13 @@ for idx, video in enumerate(video_list, start=1):
         reply = detail.get('Reply', {})
         emergency = detail.get('emergency', {})
 
-        # 第一个视频时保存 UP 主基础数据（从 Card 获取，不需要额外请求）
+        # 第一个视频时保存 UP 主基础数据
         if idx == 1:
             card_info = card.get('card', {})
+            # 补充总播放数（Card 里没有）
+            upstat_resp = session.get(f'https://api.bilibili.com/x/space/upstat?mid={UID}').json()
+            total_views = upstat_resp['data'].get('archive', {}).get('view', 0) if upstat_resp['code'] == 0 else 0
+
             basic_data_json = [{
                 'UID': UID,
                 '昵称': card_info.get('name', ''),
@@ -263,6 +267,7 @@ for idx, video in enumerate(video_list, start=1):
                 '粉丝数': str(card.get('follower', 0)),
                 '关注数': str(card_info.get('attention', 0)),
                 '获赞数': str(card.get('like_num', 0)),
+                '播放数': str(total_views),
                 '作品数': str(card.get('archive_count', 0)),
                 '文章数': str(card.get('article_count', 0)),
             }]
@@ -275,6 +280,7 @@ for idx, video in enumerate(video_list, start=1):
             print(f"昵称:{basic_data_json[0]['昵称']}")
             print(f"粉丝数:{int(basic_data_json[0]['粉丝数']):,}")
             print(f"获赞数:{int(basic_data_json[0]['获赞数']):,}")
+            print(f"播放数:{int(basic_data_json[0]['播放数']):,}")
             print(f"作品数:{basic_data_json[0]['作品数']}")
             print('=' * 50)
             print(f'基础数据保存成功: {basic_data_path}')

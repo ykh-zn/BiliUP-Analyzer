@@ -472,42 +472,111 @@ st.sidebar.divider()
 # 手动输入 UID 爬取
 st.sidebar.subheader("爬取新 UP 主")
 new_uid = st.sidebar.text_input("输入 B站 UID")
-crawl_btn = st.sidebar.button("开始爬取", disabled=not new_uid)
+is_crawling = 'crawl_proc' in st.session_state
+
+btn_col1, btn_col2 = st.sidebar.columns(2)
+with btn_col1:
+    crawl_btn = st.button("开始爬取", disabled=(not new_uid or is_crawling), use_container_width=True)
+with btn_col2:
+    stop_btn = st.button("停止爬取", disabled=not is_crawling, use_container_width=True, key="stop_crawl")
+
+st.markdown("""
+<style>
+div[data-testid="stSidebar"] button[data-testid="stBaseButton-stop_crawl"] {
+    background-color: #ff4b4b !important;
+    color: white !important;
+    border: none !important;
+}
+div[data-testid="stSidebar"] button[data-testid="stBaseButton-stop_crawl"]:disabled {
+    background-color: #cccccc !important;
+    color: #999999 !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # 爬虫状态
 if crawl_btn and new_uid:
-    st.session_state['crawling'] = True
-    st.session_state['crawl_uid'] = new_uid
+    import threading
+    from queue import Queue
 
-if st.session_state.get('crawling'):
-    st.sidebar.info(f"正在爬取 UID: {st.session_state['crawl_uid']} ...")
-    # 使用绝对路径，避免工作目录问题
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     script_path = os.path.join(project_root, 'crawler', 'bilibili_selenium.py')
-    log_area = st.sidebar.empty()
-    log_lines = []
-    try:
-        proc = subprocess.Popen(
-            [sys.executable, script_path, '--uid', st.session_state['crawl_uid']],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, encoding='utf-8', errors='replace',
-            cwd=project_root,
-        )
+    log_queue = Queue()
+
+    env = os.environ.copy()
+    env['PYTHONIOENCODING'] = 'utf-8'
+    proc = subprocess.Popen(
+        [sys.executable, '-u', script_path, '--uid', new_uid],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        bufsize=1, text=True, encoding='utf-8', errors='replace',
+        cwd=project_root, env=env,
+    )
+
+    def read_output(proc, queue):
         for line in proc.stdout:
-            log_lines.append(line.strip())
-            log_area.text_area("爬取日志", '\n'.join(log_lines[-20:]), height=300)
+            queue.put(line.strip())
         proc.wait()
+        queue.put(None)  # 结束标记
+
+    thread = threading.Thread(target=read_output, args=(proc, log_queue), daemon=True)
+    thread.start()
+
+    st.session_state['crawl_proc'] = proc
+    st.session_state['crawl_uid'] = new_uid
+    st.session_state['crawl_logs'] = []
+    st.session_state['crawl_queue'] = log_queue
+    st.rerun()
+
+if 'crawl_proc' in st.session_state:
+    proc = st.session_state['crawl_proc']
+    log_lines = st.session_state['crawl_logs']
+    queue = st.session_state['crawl_queue']
+
+    # 从队列读取新行
+    while not queue.empty():
+        line = queue.get_nowait()
+        if line is None:
+            break
+        log_lines.append(line)
+
+    if stop_btn:
+        proc.terminate()
+        for key in ['crawl_proc', 'crawl_logs', 'crawl_queue', 'crawl_progress']:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.sidebar.warning("已停止爬取")
+        st.rerun()
+
+    # 解析进度
+    progress = 0.0
+    progress_text = ""
+    for line in reversed(log_lines):
+        match = re.search(r'爬取第\s*(\d+)/(\d+)\s*个视频', line)
+        if match:
+            current, total = int(match.group(1)), int(match.group(2))
+            progress = current / total
+            progress_text = f"{current}/{total}"
+            break
+    if progress > 0:
+        st.sidebar.progress(progress, text=f"进度: {progress_text}")
+    if proc.poll() is not None:
+        # 进程已结束
         if proc.returncode == 0:
             st.sidebar.success("爬取完成！")
             selected_uid = st.session_state['crawl_uid']
             uid_list = get_available_uids()
         else:
             st.sidebar.error(f"爬取失败，返回码: {proc.returncode}")
-            st.sidebar.text_area("错误日志", '\n'.join(log_lines[-10:]), height=200)
-    except Exception as e:
-        st.sidebar.error(f"启动爬虫失败: {e}")
-    st.session_state['crawling'] = False
-    st.rerun()
+        for key in ['crawl_proc', 'crawl_logs', 'crawl_queue']:
+            if key in st.session_state:
+                del st.session_state[key]
+    else:
+        # 进程还在运行，显示进度和日志
+        st.sidebar.info(f"正在爬取 UID: {st.session_state['crawl_uid']}")
+        log_text = '\n'.join(reversed(log_lines[-15:]))
+        st.sidebar.text_area("爬取日志", log_text, height=250)
+        time.sleep(0.5)
+        st.rerun()
 
 
 # ============================== 主页面 ==============================
