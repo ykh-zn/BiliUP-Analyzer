@@ -8,6 +8,7 @@ RAW_DIR = os.path.join('.', 'data', 'raw')
 
 
 def convert_count(value):
+    """将B站数值字符串转为int，支持'1.2万'格式"""
     value_str = str(value).strip()
     if "万" in value_str:
         num_part = re.sub(r'[^\d.]', '', value_str)
@@ -20,6 +21,7 @@ def convert_count(value):
 
 
 def get_available_uids():
+    """扫描data/raw目录，返回已爬取的(UID, 昵称)列表"""
     if not os.path.isdir(RAW_DIR):
         return []
     uids = []
@@ -39,6 +41,7 @@ def get_available_uids():
 
 
 def delete_uid(uid):
+    """删除指定UID的全部数据目录"""
     target = os.path.join(RAW_DIR, f'UID_{uid}')
     if os.path.isdir(target):
         shutil.rmtree(target)
@@ -47,6 +50,7 @@ def delete_uid(uid):
 
 
 def load_basic_data(uid):
+    """加载指定UID的UP主基础信息（昵称、粉丝、获赞等）"""
     path = os.path.join(RAW_DIR, f'UID_{uid}', 'basic_data.json')
     if not os.path.exists(path):
         return None
@@ -58,6 +62,7 @@ def load_basic_data(uid):
 
 
 def parse_duration(dur_str):
+    """将'HH:MM:SS'或'MM:SS'格式时长转为总秒数"""
     if not dur_str or pd.isna(dur_str):
         return 0
     parts = str(dur_str).split(':')
@@ -72,6 +77,7 @@ def parse_duration(dur_str):
 
 
 def load_video_data(uid):
+    """加载视频数据JSON，清洗类型，计算互动率等衍生指标"""
     path = os.path.join(RAW_DIR, f'UID_{uid}', 'video_data.json')
     if not os.path.exists(path):
         return None
@@ -113,6 +119,7 @@ def load_video_data(uid):
 
 
 def clean_data(df):
+    """清洗数据：排除播放量=0、去重、统计空标签/简介，返回(清洗后df, 日志列表)"""
     log = []
     n_original = len(df)
 
@@ -147,6 +154,7 @@ def clean_data(df):
 
 
 def generate_excel(uid, basic, df_raw):
+    """生成格式化Excel文件（表头样式、斑马纹、自动筛选），返回bytes"""
     from io import BytesIO
 
     output = BytesIO()
@@ -186,6 +194,7 @@ def generate_excel(uid, basic, df_raw):
 
 
 def generate_markdown(uid, basic, df):
+    """生成Markdown格式的数据分析报告"""
     lines = [f'# UID:{uid} 数据分析报告\n', f'**总视频数**: {len(df)}\n', '## 基础数据\n']
     lines.append(f'- 昵称: {basic.get("昵称", "")}')
     lines.append(f'- 粉丝数: {int(basic.get("粉丝数", 0)):,}')

@@ -37,10 +37,12 @@ MIXIN_KEY_ENC_TAB = [
 
 
 def get_mixin_key(orig: str) -> str:
+    """按MIXIN_KEY_ENC_TAB索引表重排字符串，取前32位作为签名密钥"""
     return ''.join([orig[i] for i in MIXIN_KEY_ENC_TAB])[:32]
 
 
 def enc_wbi(params: dict, img_key: str, sub_key: str) -> dict:
+    """对请求参数进行WBI签名：排序→过滤特殊字符→拼接密钥→MD5哈希"""
     mixin_key = get_mixin_key(img_key + sub_key)
     params['wts'] = round(time.time())
     params = dict(sorted(params.items()))

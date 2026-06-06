@@ -4,6 +4,7 @@ from itertools import combinations
 
 
 def analyze_top10_views(df):
+    """分析Top10播放量视频的头部效应"""
     top10 = df.nlargest(10, '播放量')
     t1, t10 = top10.iloc[0], top10.iloc[-1]
     gap = t1['播放量'] / t10['播放量'] if t10['播放量'] > 0 else 0
@@ -13,6 +14,7 @@ def analyze_top10_views(df):
 
 
 def analyze_pareto(df):
+    """分析二八定律：Top20%视频占总播放量的比例"""
     n_top = max(1, int(len(df) * 0.2))
     top_views = df.nlargest(n_top, '播放量')['播放量'].sum()
     total = df['播放量'].sum()
@@ -26,6 +28,7 @@ def analyze_pareto(df):
 
 
 def analyze_duration_scatter(df):
+    """分析不同时长区间的平均播放量，找出最佳时长"""
     df_dur = df[df['时长秒'] > 0].copy()
     if df_dur.empty:
         return ""
@@ -43,6 +46,7 @@ def analyze_duration_scatter(df):
 
 
 def analyze_duration_boxplot(df):
+    """分析不同时长段的中位数播放量"""
     df_dur = df[df['时长秒'] > 0].copy()
     if df_dur.empty:
         return ""
@@ -57,6 +61,7 @@ def analyze_duration_boxplot(df):
 
 
 def analyze_heatmap(df):
+    """分析星期×小时维度的最佳发布时间"""
     df_h = df.copy()
     df_h['星期'] = df_h['发布(更改)时间'].dt.dayofweek
     df_h['小时'] = df_h['发布(更改)时间'].dt.hour
@@ -69,6 +74,7 @@ def analyze_heatmap(df):
 
 
 def analyze_hourly(df):
+    """分析发布最频繁的时段"""
     df_h = df.copy()
     df_h['小时'] = df_h['发布(更改)时间'].dt.hour
     counts = df_h['小时'].value_counts()
@@ -77,6 +83,7 @@ def analyze_hourly(df):
 
 
 def analyze_engagement_boxplot(df):
+    """分析各类互动率的高低对比"""
     rates = {'弹幕率': df['弹幕率'].mean(), '投币率': df['投币率'].mean(),
              '收藏率': df['收藏率'].mean(), '转发率': df['转发率'].mean()}
     best = max(rates, key=rates.get)
@@ -85,6 +92,7 @@ def analyze_engagement_boxplot(df):
 
 
 def analyze_views_vs_coinrate(df):
+    """分析播放量与投币率的相关性"""
     corr = df['播放量'].corr(df['投币率'])
     if corr > 0.3:
         return f"播放量与投币率正相关（r={corr:.2f}），高播放视频投币率也较高"
@@ -94,6 +102,7 @@ def analyze_views_vs_coinrate(df):
 
 
 def analyze_views_vs_commentrate(df):
+    """分析播放量与评论率的相关性"""
     corr = df['播放量'].corr(df['评论率'])
     if corr > 0.3:
         return f"播放量与评论率正相关（r={corr:.2f}），高播放视频引发更多讨论"
@@ -103,6 +112,7 @@ def analyze_views_vs_commentrate(df):
 
 
 def analyze_coin_ratio(df):
+    """分析点赞投币比，比值越高说明内容越有深度"""
     valid = df[(df['点赞量'] > 0) & (df['投币数'] > 0)].copy()
     if valid.empty:
         return ""
@@ -112,12 +122,14 @@ def analyze_coin_ratio(df):
 
 
 def analyze_favorite_rate(df):
+    """分析收藏率，高收藏率代表干货/教程类内容"""
     top = df.nlargest(1, '收藏率').iloc[0]
     avg = df['收藏率'].mean()
     return f"平均收藏率: {avg:.4%}，最高: {top['标题'][:20]}...（{top['收藏率']:.4%}），高收藏 = 干货/教程类内容"
 
 
 def analyze_cumulative(df):
+    """分析累计播放量增长趋势（加速/放缓/平稳）"""
     df_sorted = df.sort_values('发布(更改)时间')
     total = df_sorted['播放量'].sum()
     mid = len(df_sorted) // 2
@@ -131,6 +143,7 @@ def analyze_cumulative(df):
 
 
 def analyze_interval(df):
+    """分析视频发布间隔的平均值和最大值"""
     df_sorted = df.sort_values('发布(更改)时间')
     dates = df_sorted['发布(更改)时间'].dt.date.unique()
     if len(dates) < 2:
@@ -140,6 +153,7 @@ def analyze_interval(df):
 
 
 def analyze_views_wave(df):
+    """识别爆款视频（超过均值+2σ）"""
     views = df['播放量']
     mean, std = views.mean(), views.std()
     threshold = mean + 2 * std
@@ -151,6 +165,7 @@ def analyze_views_wave(df):
 
 
 def analyze_monthly_trend(df):
+    """分析月度发布数和平均播放量趋势"""
     df_m = df.copy()
     df_m['发布年月'] = df_m['发布(更改)时间'].dt.to_period('M')
     monthly = df_m.groupby('发布年月').agg(发布数=('标题', 'count'), 平均播放量=('播放量', 'mean'))
@@ -162,6 +177,7 @@ def analyze_monthly_trend(df):
 
 
 def analyze_views_dist(df):
+    """分析播放量分布的偏态（右偏/左偏/正态）"""
     views = df['播放量']
     mean, median = views.mean(), views.median()
     skew = (mean - median) / median if median > 0 else 0
@@ -173,6 +189,7 @@ def analyze_views_dist(df):
 
 
 def analyze_top_tags(df, top_n=20):
+    """统计高频标签和平均每视频标签数"""
     all_tags = []
     for tags_str in df['标签'].dropna():
         if tags_str:
@@ -185,6 +202,7 @@ def analyze_top_tags(df, top_n=20):
 
 
 def analyze_tag_impact(df, top_n=10):
+    """分析Top标签对播放量的提升效果"""
     all_tags = []
     for tags_str in df['标签'].dropna():
         if tags_str:
@@ -206,6 +224,7 @@ def analyze_tag_impact(df, top_n=10):
 
 
 def analyze_cooccurrence(df):
+    """分析标签共现关系，找出最强标签组合"""
     video_tags = []
     for tags_str in df['标签'].dropna():
         if tags_str:
@@ -225,6 +244,7 @@ def analyze_cooccurrence(df):
 
 
 def analyze_tag_trend(df, top_n=5):
+    """分析Top标签的播放量月度趋势变化"""
     all_tags = []
     for tags_str in df['标签'].dropna():
         if tags_str:

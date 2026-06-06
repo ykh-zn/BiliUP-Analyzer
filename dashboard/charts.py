@@ -17,6 +17,7 @@ pio.templates['plotly'].layout.hoverlabel.font.size = 16
 
 
 def plot_top10_views(df):
+    """绘制播放量Top10水平柱状图"""
     top10 = df.nlargest(10, '播放量').iloc[::-1]
     fig = go.Figure(go.Bar(
         x=top10['播放量'],
@@ -30,6 +31,7 @@ def plot_top10_views(df):
 
 
 def plot_pareto(df):
+    """绘制二八定律环形图：Top20%视频占总播放量比例"""
     n_top = max(1, int(len(df) * 0.2))
     top_views = df.nlargest(n_top, '播放量')['播放量'].sum()
     rest_views = df['播放量'].sum() - top_views
@@ -45,6 +47,7 @@ def plot_pareto(df):
 
 
 def plot_duration_vs_views(df):
+    """绘制时长-播放量散点图，颜色映射投币数"""
     df_dur = df[df['时长秒'] > 0].copy()
     if df_dur.empty:
         return None
@@ -57,6 +60,7 @@ def plot_duration_vs_views(df):
 
 
 def plot_duration_boxplot(df):
+    """绘制不同时长段的播放量箱线图"""
     df_dur = df[df['时长秒'] > 0].copy()
     if df_dur.empty:
         return None
@@ -75,6 +79,7 @@ def plot_duration_boxplot(df):
 
 
 def plot_hour_heatmap(df):
+    """绘制星期×小时平均播放量热力图"""
     df_h = df.copy()
     df_h['星期'] = df_h['发布(更改)时间'].dt.dayofweek
     df_h['小时'] = df_h['发布(更改)时间'].dt.hour
@@ -96,6 +101,7 @@ def plot_hour_heatmap(df):
 
 
 def plot_hourly_distribution(df):
+    """绘制按小时的视频发布数量分布柱状图"""
     df_h = df.copy()
     df_h['小时'] = df_h['发布(更改)时间'].dt.hour
     hour_dist = df_h['小时'].value_counts().sort_index()
@@ -106,6 +112,7 @@ def plot_hourly_distribution(df):
 
 
 def plot_engagement_boxplot(df):
+    """绘制弹幕率/投币率/收藏率/转发率的箱线图"""
     rate_cols = ['弹幕率', '投币率', '收藏率', '转发率']
     fig = go.Figure()
     colors = ['#00a1d6', '#fb7299', '#ffb81c', '#6dc781']
@@ -116,6 +123,7 @@ def plot_engagement_boxplot(df):
 
 
 def plot_views_vs_coinrate(df):
+    """绘制播放量vs投币率散点图"""
     color_col = '评论数' if '评论数' in df.columns and df['评论数'].sum() > 0 else '弹幕数'
     fig = px.scatter(df, x='播放量', y='投币率', color=color_col,
                      color_continuous_scale='purpor', hover_data=['标题'],
@@ -125,6 +133,7 @@ def plot_views_vs_coinrate(df):
 
 
 def plot_views_vs_commentrate(df):
+    """绘制播放量vs评论率散点图"""
     fig = px.scatter(df, x='播放量', y='评论率', color='弹幕数',
                      color_continuous_scale='tealgrn', hover_data=['标题'],
                      title='播放量 vs 评论率')
@@ -133,6 +142,7 @@ def plot_views_vs_commentrate(df):
 
 
 def plot_top10_coin_ratio(df):
+    """绘制点赞投币比Top10水平柱状图"""
     valid = df[(df['点赞量'] > 0) & (df['投币数'] > 0)].copy()
     if valid.empty:
         return None
@@ -149,6 +159,7 @@ def plot_top10_coin_ratio(df):
 
 
 def plot_top10_favorite_rate(df):
+    """绘制收藏率Top10水平柱状图"""
     top10 = df.nlargest(10, '收藏率').iloc[::-1]
     fig = go.Figure(go.Bar(
         x=top10['收藏率'],
@@ -162,6 +173,7 @@ def plot_top10_favorite_rate(df):
 
 
 def plot_cumulative_views(df):
+    """绘制累计播放量增长曲线"""
     df_sorted = df.sort_values('发布(更改)时间').copy()
     df_sorted['累计播放量'] = df_sorted['播放量'].cumsum()
     fig = go.Figure()
@@ -175,6 +187,7 @@ def plot_cumulative_views(df):
 
 
 def plot_publish_interval(df):
+    """绘制视频发布间隔折线图"""
     df_sorted = df.sort_values('发布(更改)时间').copy()
     dates = df_sorted['发布(更改)时间'].dt.date.unique()
     if len(dates) < 2:
@@ -192,6 +205,7 @@ def plot_publish_interval(df):
 
 
 def plot_views_wave(df):
+    """绘制单视频播放量折线图，标注爆款（均值+2σ）"""
     df_sorted = df.sort_values('发布(更改)时间').copy()
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -214,6 +228,7 @@ def plot_views_wave(df):
 
 
 def plot_monthly_trend(df):
+    """绘制月度发布数+平均播放量双轴图"""
     df_m = df.copy()
     df_m['发布年月'] = df_m['发布(更改)时间'].dt.to_period('M')
     monthly = df_m.groupby('发布年月').agg(发布数=('标题', 'count'), 平均播放量=('播放量', 'mean')).reset_index()
@@ -233,6 +248,7 @@ def plot_monthly_trend(df):
 
 
 def plot_views_distribution(df):
+    """绘制播放量对数等距分桶直方图"""
     views = df[df['播放量'] > 0]['播放量']
     if views.empty:
         return go.Figure()
@@ -253,6 +269,7 @@ def plot_views_distribution(df):
 
 
 def generate_wordcloud(tags_series):
+    """根据标签序列生成词云图"""
     all_tags = []
     for tags_str in tags_series.dropna():
         if tags_str:
@@ -268,6 +285,7 @@ def generate_wordcloud(tags_series):
 
 
 def plot_top_tags(df, top_n=20):
+    """绘制高频标签Top N水平柱状图"""
     if '标签' not in df.columns:
         return None
     all_tags = []
@@ -286,6 +304,7 @@ def plot_top_tags(df, top_n=20):
 
 
 def plot_tag_impact(df, top_n=10):
+    """绘制标签影响力对比：有/无某标签时的平均播放量"""
     if '标签' not in df.columns:
         return None
     all_tags = []
@@ -310,6 +329,7 @@ def plot_tag_impact(df, top_n=10):
 
 
 def plot_tag_cooccurrence(df, top_n=15):
+    """绘制标签共现网络图（圆形布局，连线粗细=共现次数）"""
     if '标签' not in df.columns:
         return None
     video_tags = []
@@ -372,6 +392,7 @@ def plot_tag_cooccurrence(df, top_n=15):
 
 
 def plot_tag_trend(df, top_n=5):
+    """绘制Top标签的平均播放量月度趋势折线图"""
     if '标签' not in df.columns:
         return None
     all_tags = []
