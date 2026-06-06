@@ -57,12 +57,12 @@ if uid_options:
         st.sidebar.warning(f"确认删除 UID {selected_uid} 的所有数据？")
         col_yes, col_no = st.sidebar.columns(2)
         with col_yes:
-            if st.button("确认", key="confirm_yes", type="primary", use_container_width=True):
+            if st.button("确认", key="confirm_yes", type="primary", width='stretch'):
                 delete_uid(selected_uid)
                 st.session_state['confirm_delete'] = None
                 st.rerun()
         with col_no:
-            if st.button("取消", key="confirm_no", use_container_width=True):
+            if st.button("取消", key="confirm_no", width='stretch'):
                 st.session_state['confirm_delete'] = None
                 st.rerun()
 
@@ -72,9 +72,9 @@ new_uid = st.sidebar.text_input("输入 B站 UID")
 is_crawling = 'crawl_proc' in st.session_state
 btn_col1, btn_col2 = st.sidebar.columns(2)
 with btn_col1:
-    crawl_btn = st.button("开始爬取", disabled=(not new_uid or is_crawling), use_container_width=True)
+    crawl_btn = st.button("开始爬取", disabled=(not new_uid or is_crawling), width='stretch')
 with btn_col2:
-    stop_btn = st.button("停止爬取", disabled=not is_crawling, use_container_width=True, key="stop_crawl")
+    stop_btn = st.button("停止爬取", disabled=not is_crawling, width='stretch', key="stop_crawl")
 
 st.markdown("""<style>
 div[data-testid="stSidebar"] button[data-testid="stBaseButton-stop_crawl"] { background-color: #ff4b4b !important; color: white !important; border: none !important; }
@@ -232,8 +232,8 @@ with tab1:
     st.divider()
 
     col_chart1, col_chart2 = st.columns(2)
-    with col_chart1: st.plotly_chart(plot_top10_views(df), use_container_width=True)
-    with col_chart2: st.plotly_chart(plot_pareto(df), use_container_width=True)
+    with col_chart1: st.plotly_chart(plot_top10_views(df), width='stretch')
+    with col_chart2: st.plotly_chart(plot_pareto(df), width='stretch')
     a1, a2 = st.columns(2)
     with a1: st.markdown(f"<b>分析：</b>{analyze_top10_views(df)}", unsafe_allow_html=True)
     with a2: st.markdown(f"<b>分析：</b>{analyze_pareto(df)}", unsafe_allow_html=True)
@@ -245,8 +245,8 @@ with tab2:
     dur_fig2 = plot_duration_boxplot(df)
     if dur_fig1 and dur_fig2:
         col_d1, col_d2 = st.columns(2)
-        with col_d1: st.plotly_chart(dur_fig1, use_container_width=True)
-        with col_d2: st.plotly_chart(dur_fig2, use_container_width=True)
+        with col_d1: st.plotly_chart(dur_fig1, width='stretch')
+        with col_d2: st.plotly_chart(dur_fig2, width='stretch')
         a1, a2 = st.columns(2)
         with a1: st.markdown(f"<b>分析：</b>{analyze_duration_scatter(df)}", unsafe_allow_html=True)
         with a2: st.markdown(f"<b>分析：</b>{analyze_duration_boxplot(df)}", unsafe_allow_html=True)
@@ -257,8 +257,8 @@ with tab2:
 
     st.subheader("发布时间分析")
     col_h1, col_h2 = st.columns(2)
-    with col_h1: st.plotly_chart(plot_hour_heatmap(df), use_container_width=True)
-    with col_h2: st.plotly_chart(plot_hourly_distribution(df), use_container_width=True)
+    with col_h1: st.plotly_chart(plot_hour_heatmap(df), width='stretch')
+    with col_h2: st.plotly_chart(plot_hourly_distribution(df), width='stretch')
     a1, a2 = st.columns(2)
     with a1: st.markdown(f"<b>分析：</b>{analyze_heatmap(df)}", unsafe_allow_html=True)
     with a2: st.markdown(f"<b>分析：</b>{analyze_hourly(df)}", unsafe_allow_html=True)
@@ -267,8 +267,8 @@ with tab2:
 with tab3:
     st.subheader("互动率分布")
     col_i1, col_i2 = st.columns(2)
-    with col_i1: st.plotly_chart(plot_engagement_boxplot(df), use_container_width=True)
-    with col_i2: st.plotly_chart(plot_views_vs_coinrate(df), use_container_width=True)
+    with col_i1: st.plotly_chart(plot_engagement_boxplot(df), width='stretch')
+    with col_i2: st.plotly_chart(plot_views_vs_coinrate(df), width='stretch')
     a1, a2 = st.columns(2)
     with a1: st.markdown(f"<b>分析：</b>{analyze_engagement_boxplot(df)}", unsafe_allow_html=True)
     with a2: st.markdown(f"<b>分析：</b>{analyze_views_vs_coinrate(df)}", unsafe_allow_html=True)
@@ -277,11 +277,11 @@ with tab3:
 
     st.subheader("深度互动")
     col_i3, col_i4 = st.columns(2)
-    with col_i3: st.plotly_chart(plot_views_vs_commentrate(df), use_container_width=True)
+    with col_i3: st.plotly_chart(plot_views_vs_commentrate(df), width='stretch')
     with col_i4:
         fig_coin_ratio = plot_top10_coin_ratio(df)
         if fig_coin_ratio:
-            st.plotly_chart(fig_coin_ratio, use_container_width=True)
+            st.plotly_chart(fig_coin_ratio, width='stretch')
         else:
             st.info("无法计算点赞投币比")
     a1, a2 = st.columns(2)
@@ -295,13 +295,13 @@ with tab3:
     st.subheader("干货内容")
     fig_fav = plot_top10_favorite_rate(df)
     if fig_fav:
-        st.plotly_chart(fig_fav, use_container_width=True)
+        st.plotly_chart(fig_fav, width='stretch')
         st.markdown(f"<b>分析：</b>{analyze_favorite_rate(df)}", unsafe_allow_html=True)
 
 # ============================== Tab4: 生命周期 ==============================
 with tab4:
     st.subheader("增长趋势")
-    st.plotly_chart(plot_cumulative_views(df), use_container_width=True)
+    st.plotly_chart(plot_cumulative_views(df), width='stretch')
     st.markdown(f"<b>分析：</b>{analyze_cumulative(df)}", unsafe_allow_html=True)
 
     st.divider()
@@ -311,11 +311,11 @@ with tab4:
     with col_l1:
         fig_interval = plot_publish_interval(df)
         if fig_interval:
-            st.plotly_chart(fig_interval, use_container_width=True)
+            st.plotly_chart(fig_interval, width='stretch')
         else:
             st.info("视频数量不足，无法计算发布间隔")
     with col_l2:
-        st.plotly_chart(plot_views_wave(df), use_container_width=True)
+        st.plotly_chart(plot_views_wave(df), width='stretch')
     a1, a2 = st.columns(2)
     with a1:
         if fig_interval:
@@ -327,8 +327,8 @@ with tab4:
 
     st.subheader("月度与分布")
     col_l3, col_l4 = st.columns(2)
-    with col_l3: st.plotly_chart(plot_monthly_trend(df), use_container_width=True)
-    with col_l4: st.plotly_chart(plot_views_distribution(df), use_container_width=True)
+    with col_l3: st.plotly_chart(plot_monthly_trend(df), width='stretch')
+    with col_l4: st.plotly_chart(plot_views_distribution(df), width='stretch')
     a1, a2 = st.columns(2)
     with a1: st.markdown(f"<b>分析：</b>{analyze_monthly_trend(df)}", unsafe_allow_html=True)
     with a2: st.markdown(f"<b>分析：</b>{analyze_views_dist(df)}", unsafe_allow_html=True)
@@ -353,11 +353,11 @@ with tab5:
         with col_wc1:
             top_tags_fig = plot_top_tags(df_tag, top_n=20)
             if top_tags_fig:
-                st.plotly_chart(top_tags_fig, use_container_width=True)
+                st.plotly_chart(top_tags_fig, width='stretch')
         with col_wc2:
             impact_fig = plot_tag_impact(df, top_n=10)
             if impact_fig:
-                st.plotly_chart(impact_fig, use_container_width=True)
+                st.plotly_chart(impact_fig, width='stretch')
         a1, a2 = st.columns(2)
         with a1:
             if top_tags_fig:
@@ -373,13 +373,13 @@ with tab5:
         with col_t1:
             cooc_fig = plot_tag_cooccurrence(df_tag, top_n=15)
             if cooc_fig:
-                st.plotly_chart(cooc_fig, use_container_width=True)
+                st.plotly_chart(cooc_fig, width='stretch')
             else:
                 st.info("标签共现数据不足")
         with col_t2:
             trend_fig = plot_tag_trend(df, top_n=5)
             if trend_fig:
-                st.plotly_chart(trend_fig, use_container_width=True)
+                st.plotly_chart(trend_fig, width='stretch')
             else:
                 st.info("标签趋势数据不足")
         a1, a2 = st.columns(2)

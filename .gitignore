@@ -4,9 +4,6 @@ data/cookies.json
 # 爬取的原始数据
 data/raw/
 
-# 生成的分析报告
-data/output/
-
 # Python
 __pycache__/
 *.pyc
