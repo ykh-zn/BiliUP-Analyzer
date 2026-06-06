@@ -96,7 +96,25 @@ BiliUP-Analyzer/
 
 ## 截图
 
+### 数据概览
+
 ![数据概览](screenshots/overview.png)
+
+### 内容策略
+
+![内容策略](screenshots/content_strategy.png)
+
+### 互动分析
+
+![互动分析](screenshots/engagement.png)
+
+### 生命周期
+
+![生命周期](screenshots/lifecycle.png)
+
+### 标签分析
+
+![标签分析](screenshots/tag_analysis.png)
 
 ---
 
