@@ -69,12 +69,16 @@ if uid_options:
 st.sidebar.divider()
 st.sidebar.subheader("爬取新 UP 主")
 new_uid = st.sidebar.text_input("输入 B站 UID")
-is_crawling = 'crawl_proc' in st.session_state
-btn_col1, btn_col2 = st.sidebar.columns(2)
+crawl_proc = st.session_state.get('crawl_proc')
+is_crawling = crawl_proc is not None and crawl_proc.poll() is None
+crawl_done = crawl_proc is not None and crawl_proc.poll() is not None
+btn_col1, btn_col2, btn_col3 = st.sidebar.columns(3)
 with btn_col1:
     crawl_btn = st.button("开始爬取", disabled=(not new_uid or is_crawling), width='stretch')
 with btn_col2:
     stop_btn = st.button("停止爬取", disabled=not is_crawling, width='stretch', key="stop_crawl")
+with btn_col3:
+    clear_btn = st.button("清空", disabled=not crawl_done, width='stretch', key="clear_crawl")
 
 st.markdown("""<style>
 div[data-testid="stSidebar"] button[data-testid="stBaseButton-stop_crawl"] { background-color: #ff4b4b !important; color: white !important; border: none !important; }
@@ -121,6 +125,11 @@ if 'crawl_proc' in st.session_state:
             if key in st.session_state:
                 del st.session_state[key]
         st.sidebar.warning("已停止爬取")
+        st.rerun()
+    if clear_btn and proc.poll() is not None:
+        for key in ['crawl_proc', 'crawl_logs', 'crawl_queue', 'crawl_progress', 'crawl_uid']:
+            if key in st.session_state:
+                del st.session_state[key]
         st.rerun()
     progress, progress_text = 0.0, ""
     for line in reversed(log_lines):

@@ -24,7 +24,7 @@ python run_dashboard.py
 - WBI 签名：视频列表 API `x/space/wbi/arc/search` 需要 WBI 签名（`mixinKeyEncTab` + MD5）
 - UP 主总播放数通过 `x/space/upstat` API 获取（仅第一个视频时调用一次）
 - 请求间隔 `random.uniform(0.05, 0.1)` 秒
-- 数据输出到 `data/raw/UID_{uid}/` 下三个 JSON 文件
+- 数据输出到 `data/raw/UID_{uid}/` 下两个 JSON 文件
 
 **看板**（`dashboard/` 目录，4 个模块）：
 - `data.py`（~210 行）— 数据加载/清洗/导出，无 UI 依赖
@@ -48,7 +48,6 @@ python run_dashboard.py
 | `data/cookies.json` | Selenium 登录后保存的 cookies |
 | `data/raw/UID_{uid}/basic_data.json` | UP 主基础信息（昵称、粉丝、获赞、播放数等） |
 | `data/raw/UID_{uid}/video_data.json` | 视频列表（看板读取，字段与看板列一一对应） |
-| `data/raw/UID_{uid}/raw_data.json` | 完整 API 原始响应（View+Card+Tags+Related+Reply） |
 
 ## 关键技术点
 

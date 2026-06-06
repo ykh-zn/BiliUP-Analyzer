@@ -242,7 +242,6 @@ print(f'共获取到 {num_all_video} 个视频，开始爬取详情...')
 
 # ============================== 视频详情（新 API） ==============================
 video_data_json = []
-raw_data_list = []
 error_time = 0
 
 for idx, video in enumerate(video_list, start=1):
@@ -265,9 +264,6 @@ for idx, video in enumerate(video_list, start=1):
         stat = view['stat']
         card = detail.get('Card', {})
         tags_list = detail.get('Tags', [])
-        related = detail.get('Related', [])
-        reply = detail.get('Reply', {})
-        emergency = detail.get('emergency', {})
 
         # 第一个视频时保存 UP 主基础数据
         if idx == 1:
@@ -328,20 +324,6 @@ for idx, video in enumerate(video_list, start=1):
         }
         video_data_json.append(video_info)
 
-        # 保存完整原始数据（所有字段）
-        raw_entry = {
-            'bvid': bvid,
-            'View': view,
-            'Card': card,
-            'Tags': tags_list,
-            'Related': [{'title': r['title'], 'bvid': r['bvid'],
-                         'view': r['stat']['view'], 'like': r['stat']['like']}
-                        for r in related],
-            'Reply': reply,
-            'emergency': emergency,
-        }
-        raw_data_list.append(raw_entry)
-
         time.sleep(random.uniform(0.05, 0.1))
 
     except Exception as e:
@@ -356,13 +338,6 @@ if video_data_json:
     with open(video_data_path, 'w', encoding='utf-8') as f:
         json.dump(video_data_json, f, ensure_ascii=False, indent=4)
     print(f'视频数据保存成功: {video_data_path}')
-
-# 保存 raw_data.json（完整原始数据）
-raw_data_path = os.path.join(data_dir_path, 'raw_data.json')
-if raw_data_list:
-    with open(raw_data_path, 'w', encoding='utf-8') as f:
-        json.dump(raw_data_list, f, ensure_ascii=False, indent=4)
-    print(f'原始数据保存成功: {raw_data_path}')
 
 # 统计
 num_success = len(video_data_json)
