@@ -1,21 +1,24 @@
 # Bilibili 爬虫
 
-基于 Selenium 的 B 站视频数据爬取工具，支持自动抓取 UP 主全部视频信息，通过 Streamlit 交互式看板进行数据可视化分析。
+基于 Selenium + B站 API 的视频数据爬取工具，通过 Streamlit 交互式看板进行数据可视化分析。
 
 ## 功能
 
-- 模拟浏览器自动登录，支持 cookies 持久化
+- Selenium 扫码登录获取 cookies，后续请求全部走 `requests` + B站 API
 - 抓取 UP 主基本信息（粉丝数、获赞数、总播放量）及全部视频列表分页采集
 - 每条视频提取：标题、简介、视频时长、标签、播放量、弹幕数、点赞、投币、收藏、转发、评论数、发布时间
-- Streamlit 交互式看板：数据概览、图表分析、标签词云
-- 支持导出 Excel 报告和 Markdown 报告
+- Streamlit 交互式看板，5 个 Tab：数据概览、内容策略、互动分析、生命周期、标签分析
+- 从看板直接启动爬虫，实时日志显示，支持中途停止
+- 支持删除已爬取的 UP 主数据
+- 支持导出 Markdown 报告、Excel（原始数据）、原始 JSON
 
 ## 依赖
 
 | 包 | 用途 |
 |---|---|
-| `selenium` | 浏览器自动化，模拟登录与翻页 |
-| `pandas` | 数据清洗、统计、导出 Excel |
+| `selenium` | 浏览器自动化，首次登录获取 cookies |
+| `requests` | B站 API 请求 |
+| `pandas` | 数据处理与导出 Excel |
 | `streamlit` | 交互式数据看板 |
 | `plotly` | 交互式图表 |
 | `wordcloud` | 标签词云生成 |
@@ -39,8 +42,7 @@ bilibili_crawler/
 │   └── app.py                   # Streamlit 看板
 ├── data/
 │   ├── cookies.json             # 登录凭证（gitignore）
-│   ├── raw/                     # 爬取的原始数据
-│   └── output/                  # 分析报告输出
+│   └── raw/                     # 爬取的原始数据
 ├── run_crawler.py               # 爬虫启动入口
 ├── run_dashboard.py             # 看板启动入口
 ├── requirements.txt
@@ -73,8 +75,10 @@ python run_dashboard.py
 
 | Tab | 内容 |
 |-----|------|
-| 数据概览 | UP 主信息卡片、统计摘要、播放量 Top10 |
-| 视频分析 | 月度趋势、播放量分布、互动率箱线图、发布时间分布、播放量 vs 投币率散点图、视频数据表格 |
-| 标签分析 | 标签词云、高频标签 Top20、标签对播放量的影响 |
+| 数据概览 | UP 主信息卡片、统计摘要、播放量 Top10、二八定律 |
+| 内容策略 | 时长分析、发布时间热力图、互动率分布、点赞投币比、收藏率 Top10 |
+| 互动分析 | 互动指标相关性、评论率分析、月度趋势 |
+| 生命周期 | 累计播放量增长、发布间隔、爆款识别 |
+| 标签分析 | 标签词云、高频标签、标签对播放量影响、共现网络、标签趋势 |
 
-侧边栏支持导出 Excel 报告和 Markdown 报告。
+侧边栏支持导出 Markdown 报告、Excel 和原始 JSON。

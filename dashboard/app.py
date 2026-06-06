@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io as pio
 from plotly.subplots import make_subplots
 import json
 import re
@@ -26,7 +27,6 @@ st.set_page_config(
 
 TITLE_FONT = dict(size=20)
 
-import plotly.io as pio
 pio.templates.default = 'plotly'
 pio.templates['plotly'].layout.hoverlabel.font.size = 16
 
@@ -807,13 +807,8 @@ def plot_tag_trend(df, top_n=5):
 
 
 # ============================== 导出功能 ==============================
-def generate_excel(uid, basic, df):
+def generate_excel(uid, basic, df_raw):
     from io import BytesIO
-    # 读取原始 video_data.json
-    vdata_path = os.path.join(RAW_DIR, f'UID_{uid}', 'video_data.json')
-    with open(vdata_path, 'r', encoding='utf-8') as f:
-        raw_data = json.load(f)
-    df_raw = pd.DataFrame(raw_data)
 
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -1014,7 +1009,7 @@ if selected_uid:
         md_content = generate_markdown(selected_uid, basic, df)
         st.sidebar.download_button(label="下载 Markdown 报告", data=md_content,
                                    file_name=f"UID_{selected_uid}_report.md", mime="text/markdown")
-        excel_bytes = generate_excel(selected_uid, basic, df)
+        excel_bytes = generate_excel(selected_uid, basic, df_raw)
         st.sidebar.download_button(label="下载 Excel", data=excel_bytes,
                                    file_name=f"UID_{selected_uid}_video_data.xlsx",
                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
