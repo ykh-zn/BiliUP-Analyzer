@@ -63,6 +63,23 @@ def get_wbi_keys():
     return img_key, sub_key
 
 
+# ============================== 带重试的请求 ==============================
+def api_get(url, params=None, max_retries=3):
+    """GET 请求，遇到 -412 等风控自动等待重试"""
+    for attempt in range(max_retries):
+        resp = session.get(url, params=params).json()
+        code = resp.get('code', -1)
+        if code == 0:
+            return resp
+        if code in (-412, -352):
+            wait = (attempt + 1) * 5 + random.uniform(1, 3)
+            print(f"  触发风控 (code={code})，等待 {wait:.0f}s 后重试 ({attempt + 1}/{max_retries})...")
+            time.sleep(wait)
+            continue
+        return resp  # 其他错误直接返回
+    return resp  # 重试用完
+
+
 # ============================== 工具函数 ==============================
 def format_duration(seconds):
     """秒数转 MM:SS 或 HH:MM:SS"""
@@ -214,7 +231,7 @@ def fetch_video_list(uid, img_key, sub_key):
             break
 
         pn += 1
-        time.sleep(random.uniform(0.3, 0.8))
+        time.sleep(random.uniform(0.1, 0.2))
 
     return video_list
 
@@ -234,9 +251,9 @@ for idx, video in enumerate(video_list, start=1):
         print(f'爬取第 {idx}/{num_all_video} 个视频: {bvid}...')
 
         # 使用 view/detail API（一个请求拿到所有数据）
-        resp = session.get(
+        resp = api_get(
             f'https://api.bilibili.com/x/web-interface/view/detail?bvid={bvid}'
-        ).json()
+        )
 
         if resp['code'] != 0:
             print(f"  失败: {resp['message']}")
@@ -325,7 +342,7 @@ for idx, video in enumerate(video_list, start=1):
         }
         raw_data_list.append(raw_entry)
 
-        time.sleep(random.uniform(0.3, 0.8))
+        time.sleep(random.uniform(0.1, 0.2))
 
     except Exception as e:
         print(f'第 {idx} 条视频爬取失败: {e}')
