@@ -26,6 +26,10 @@ st.set_page_config(
 
 TITLE_FONT = dict(size=20)
 
+import plotly.io as pio
+pio.templates.default = 'plotly'
+pio.templates['plotly'].layout.hoverlabel.font.size = 16
+
 # ============================== 数据处理函数 ==============================
 RAW_DIR = os.path.join('.', 'data', 'raw')
 
@@ -772,7 +776,6 @@ def plot_tag_cooccurrence(df, top_n=15):
                                  range=[-2.0, 2.0]),
                       yaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
                                  range=[-1.3, 1.3]),
-                      hoverlabel=dict(font_size=14),
                       height=600, plot_bgcolor='white')
     return fig
 
@@ -806,96 +809,45 @@ def plot_tag_trend(df, top_n=5):
 # ============================== 导出功能 ==============================
 def generate_excel(uid, basic, df):
     from io import BytesIO
+    # 读取原始 video_data.json
+    vdata_path = os.path.join(RAW_DIR, f'UID_{uid}', 'video_data.json')
+    with open(vdata_path, 'r', encoding='utf-8') as f:
+        raw_data = json.load(f)
+    df_raw = pd.DataFrame(raw_data)
+
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         workbook = writer.book
         center_format = workbook.add_format({"align": "center", "valign": "vcenter"})
-        percent_format = workbook.add_format({'num_format': '0.000%', 'align': 'center'})
+        left_format = workbook.add_format({"align": "left", "valign": "vcenter", "text_wrap": True})
         int_format = workbook.add_format({'num_format': '#,##0', 'align': 'center'})
         header_fmt = workbook.add_format({'align': 'center', 'valign': 'vcenter', 'bold': True,
                                           'fg_color': '#7BC4E8', 'font_color': '#FFFFFF', 'border': 1})
         row_even_fmt = workbook.add_format({'align': 'center', 'valign': 'vcenter', 'fg_color': '#E8F4FD', 'border': 1})
         row_odd_fmt = workbook.add_format({'align': 'center', 'valign': 'vcenter', 'fg_color': '#F5FAFE', 'border': 1})
-        section_fmt = workbook.add_format({'align': 'center', 'valign': 'vcenter', 'bold': True,
-                                           'fg_color': '#5BA3D9', 'font_color': '#FFFFFF', 'border': 1})
-        percent_fmt_even = workbook.add_format({'num_format': '0.000%', 'align': 'center', 'fg_color': '#E8F4FD', 'border': 1})
-        percent_fmt_odd = workbook.add_format({'num_format': '0.000%', 'align': 'center', 'fg_color': '#F5FAFE', 'border': 1})
-        int_fmt_even = workbook.add_format({'num_format': '#,##0', 'align': 'center', 'fg_color': '#E8F4FD', 'border': 1})
-        int_fmt_odd = workbook.add_format({'num_format': '#,##0', 'align': 'center', 'fg_color': '#F5FAFE', 'border': 1})
 
-        stats1 = df[['播放量', '弹幕数', '投币数', '收藏量', '转发量']].describe()
-        stats1.to_excel(writer, sheet_name='Data_Describe', index=True, index_label='Metrics', float_format='%.0f')
-        ws1 = writer.sheets['Data_Describe']
-        nrows1, ncols1 = stats1.shape
-        ws1.set_column(0, ncols1, 12, center_format)
-        ws1.set_row(0, None, header_fmt)
-        for r in range(nrows1):
-            ws1.set_row(r + 1, None, row_even_fmt if r % 2 == 0 else row_odd_fmt)
-
-        top_100 = df.sort_values('播放量', ascending=False).iloc[:100].copy()
-        top_100.index = range(1, len(top_100) + 1)
-        metric_keys = ['弹幕率', '投币率', '收藏率', '转发率']
-        stats2 = top_100[['播放量', '弹幕数', '投币数', '收藏量', '转发量', '弹幕率', '投币率', '收藏率', '转发率']]
-        stats2.to_excel(writer, sheet_name='top_100', index=True, index_label='播放量排名')
-        ws2 = writer.sheets['top_100']
-        nrows2, ncols2 = stats2.shape
-        ws2.set_column(0, 1, 12, center_format)
-        ws2.set_column(1, 5, 14, int_format)
-        for col_name in metric_keys:
-            if col_name in stats2.columns:
-                col_idx = stats2.columns.get_loc(col_name) + 1
-                ws2.set_column(col_idx, col_idx, 12, percent_format)
-        ws2.set_row(0, None, header_fmt)
-        for r in range(nrows2):
-            ws2.set_row(r + 1, None, row_even_fmt if r % 2 == 0 else row_odd_fmt)
-
-        df_m = df.copy()
-        df_m['发布年月'] = df_m['发布(更改)时间'].dt.to_period('M')
-        monthly_stats = df_m.groupby('发布年月').agg(发布视频数=('标题', 'count'), 平均播放量=('播放量', 'mean'), 播放量中位数=('播放量', 'median')).reset_index()
-        monthly_stats['发布年月'] = monthly_stats['发布年月'].astype(str)
-        monthly_stats['平均播放量'] = monthly_stats['平均播放量'].round(0).astype(int)
-        monthly_stats['播放量中位数'] = monthly_stats['播放量中位数'].astype(int)
-        monthly_stats.to_excel(writer, sheet_name='Monthly_Stats', index=False)
-        ws3 = writer.sheets['Monthly_Stats']
-        nrows3, ncols3 = monthly_stats.shape
-        ws3.set_column(0, ncols3, 14, center_format)
-        ws3.set_row(0, None, header_fmt)
-        for r in range(nrows3):
-            ws3.set_row(r + 1, None, row_even_fmt if r % 2 == 0 else row_odd_fmt)
-
-        top_view = df.nlargest(5, '播放量')[['标题', '播放量']]
-        top_dm = df.nlargest(5, '弹幕率')[['标题', '弹幕率', '弹幕数']]
-        top_coin = df.nlargest(5, '投币率')[['标题', '投币率', '投币数']]
-        top_fav = df.nlargest(5, '收藏率')[['标题', '收藏率', '收藏量']]
-        top5_data = [('播放量 Top 5', top_view, False), ('弹幕率 Top 5', top_dm, True),
-                     ('投币率 Top 5', top_coin, True), ('收藏率 Top 5', top_fav, True)]
-        ws_top = workbook.add_worksheet('Top5_排行榜')
-        current_row = 0
-        for sec_title, df_top, has_rate in top5_data:
-            ncols = len(df_top.columns)
-            ws_top.merge_range(current_row, 0, current_row, ncols - 1, sec_title, section_fmt)
-            for c in range(ncols):
-                ws_top.write(current_row, c, sec_title if c == 0 else '', section_fmt)
-            current_row += 1
-            for c, col_name in enumerate(df_top.columns):
-                ws_top.write(current_row, c, col_name, header_fmt)
-            current_row += 1
-            for r in range(len(df_top)):
-                row_fmt = row_even_fmt if r % 2 == 0 else row_odd_fmt
-                pf = percent_fmt_even if r % 2 == 0 else percent_fmt_odd
-                inf = int_fmt_even if r % 2 == 0 else int_fmt_odd
-                ws_top.write(current_row, 0, df_top.iloc[r, 0], row_fmt)
-                if has_rate:
-                    ws_top.write(current_row, 1, df_top.iloc[r, 1], pf)
-                else:
-                    ws_top.write(current_row, 1, int(df_top.iloc[r, 1]), inf)
-                if ncols >= 3:
-                    ws_top.write(current_row, 2, int(df_top.iloc[r, 2]), inf)
-                current_row += 1
-            current_row += 1
-        ws_top.set_column(0, 0, 50, center_format)
-        ws_top.set_column(1, 1, 14, center_format)
-        ws_top.set_column(2, 2, 14, center_format)
+        df_raw.to_excel(writer, sheet_name='Video_Data', index=False)
+        ws = writer.sheets['Video_Data']
+        nrows, ncols = df_raw.shape
+        ws.set_column(0, 0, 6, center_format)    # 序号
+        ws.set_column(1, 1, 40, left_format)     # 标题
+        ws.set_column(2, 2, 50, left_format)     # 简介
+        ws.set_column(3, 3, 10, center_format)   # 视频时长
+        ws.set_column(4, 4, 30, left_format)     # 标签
+        for col_name in ['播放量', '弹幕数', '点赞量', '投币数', '收藏量', '转发量', '评论数']:
+            if col_name in df_raw.columns:
+                ci = df_raw.columns.get_loc(col_name)
+                ws.set_column(ci, ci, 12, int_format)
+        if '发布(更改)时间' in df_raw.columns:
+            ci = df_raw.columns.get_loc('发布(更改)时间')
+            ws.set_column(ci, ci, 20, center_format)
+        if '视频链接' in df_raw.columns:
+            ci = df_raw.columns.get_loc('视频链接')
+            ws.set_column(ci, ci, 50, left_format)
+        ws.set_row(0, None, header_fmt)
+        for r in range(nrows):
+            ws.set_row(r + 1, None, row_even_fmt if r % 2 == 0 else row_odd_fmt)
+        ws.autofilter(0, 0, nrows, ncols - 1)
     return output.getvalue()
 
 
@@ -909,7 +861,7 @@ def generate_markdown(uid, basic, df):
         lines.append(f'- 播放数: {int(basic.get("播放数", 0)):,}')
     lines.extend(['\n## 播放量统计\n', '| 指标 | 数值 |', '|------|------|',
                   f'| 均值 | {df["播放量"].mean():.0f} |', f'| 中位数 | {df["播放量"].median():.0f} |',
-                  f'| 最高 | {df["播放量"].max()} |', f'| 最低 | {df["播放量"].min()} |', '\n## 播放量 Top 5\n'])
+                  f'| 最高 | {int(df["播放量"].max()):,} |', f'| 最低 | {int(df["播放量"].min()):,} |', '\n## 播放量 Top 5\n'])
     for i, (_, row) in enumerate(df.nlargest(5, '播放量').iterrows(), 1):
         lines.append(f'{i}. **{row["标题"]}** — {row["播放量"]:,} 播放')
     lines.append('\n## 月度趋势\n')
@@ -1059,13 +1011,19 @@ if selected_uid:
 
         st.sidebar.divider()
         st.sidebar.subheader("数据导出")
-        excel_bytes = generate_excel(selected_uid, basic, df)
-        st.sidebar.download_button(label="下载 Excel 报告", data=excel_bytes,
-                                   file_name=f"UID_{selected_uid}_report.xlsx",
-                                   mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         md_content = generate_markdown(selected_uid, basic, df)
         st.sidebar.download_button(label="下载 Markdown 报告", data=md_content,
                                    file_name=f"UID_{selected_uid}_report.md", mime="text/markdown")
+        excel_bytes = generate_excel(selected_uid, basic, df)
+        st.sidebar.download_button(label="下载 Excel", data=excel_bytes,
+                                   file_name=f"UID_{selected_uid}_video_data.xlsx",
+                                   mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        vdata_path = os.path.join(RAW_DIR, f'UID_{selected_uid}', 'video_data.json')
+        if os.path.exists(vdata_path):
+            with open(vdata_path, 'r', encoding='utf-8') as f:
+                vdata_bytes = f.read().encode('utf-8')
+            st.sidebar.download_button(label="下载原始 JSON", data=vdata_bytes,
+                                       file_name=f"UID_{selected_uid}_video_data.json", mime="application/json")
 
 if not selected_uid:
     st.info("请在左侧选择一个 UP 主，或输入新的 UID 进行爬取")
