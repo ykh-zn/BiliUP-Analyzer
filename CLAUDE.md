@@ -19,20 +19,36 @@ python run_dashboard.py
 ## 架构
 
 **爬虫** (`crawler/bilibili_selenium.py`)：
-- Selenium + Edge WebDriver 模拟浏览器爬取 B站视频数据
-- 首次运行需手动扫码登录，cookies 持久化到 `data/cookies.json`
-- 多选择器容错机制适配 B站页面结构变化（`VIDEO_CARD_SELECTORS`、`DURATION_SELECTORS` 等）
-- 数据输出到 `data/raw/UID_{uid}/` 下的 JSON 文件
+- Selenium **仅用于首次登录获取 cookies**，数据爬取全部走 `requests` + B站 API
+- 核心 API：`x/web-interface/view/detail`（一个请求拿到视频详情+Card+标签+相关推荐+评论）
+- WBI 签名：视频列表 API `x/space/wbi/arc/search` 需要 WBI 签名（`mixinKeyEncTab` + MD5）
+- UP 主总播放数通过 `x/space/upstat` API 获取（仅第一个视频时调用一次）
+- 请求间隔 `random.uniform(0.3, 0.8)` 秒
+- 数据输出到 `data/raw/UID_{uid}/` 下三个 JSON 文件
 
 **看板** (`dashboard/app.py`)：
-- Streamlit + Plotly 交互式数据看板，3 个 Tab：数据总览、图表分析、标签词云
-- 支持从看板启动爬虫（subprocess）、导出 Excel/Markdown 报告
+- Streamlit + Plotly 交互式数据看板，5 个 Tab：数据概览、内容策略、互动分析、生命周期、标签分析
+- 支持从看板启动爬虫（subprocess + threading + Queue 实现实时日志）
+- 日志倒序显示（最新在上），15 行，250px 高度
+- 进程中可停止爬取（红色停止按钮）
+- `PYTHONIOENCODING=utf-8` 解决 Windows GBK 编码问题
+- 导出 Excel（xlsxwriter）/ Markdown 报告
 - 路径基于 `__file__` 计算 project_root，确保子进程正确执行
 
 **数据流**：爬虫写 JSON → 看板读取 JSON → 展示/导出
 
+## 数据文件
+
+| 文件 | 内容 |
+|------|------|
+| `data/cookies.json` | Selenium 登录后保存的 cookies |
+| `data/raw/UID_{uid}/basic_data.json` | UP 主基础信息（昵称、粉丝、获赞、播放数等） |
+| `data/raw/UID_{uid}/video_data.json` | 视频列表（看板读取，字段与看板列一一对应） |
+| `data/raw/UID_{uid}/raw_data.json` | 完整 API 原始响应（View+Card+Tags+Related+Reply） |
+
 ## 关键技术点
 
-- 爬虫用 `presence_of_all_elements_located` 遍历多个元素解决 B站同一选择器返回空元素的问题（如时长字段页面有 21 个匹配元素，第 1 个为空）
-- `find_element_by_selectors` / `find_elements_by_selectors` 是核心容错函数，所有选择器列表定义在文件顶部
+- WBI 签名：`enc_wbi()` 函数，`MIXIN_KEY_ENC_TAB` 索引表 + `img_key + sub_key` 拼接后取前 32 位作为 mixin_key
+- 看板 subprocess 爬虫：`threading.Thread` 读取 stdout → `Queue` → Streamlit 轮询显示，0.5s 刷新
 - 看板中 `generate_excel` 用 `BytesIO` + `xlsxwriter` 内存生成 Excel，不落盘
+- Windows 下 subprocess 需设 `env['PYTHONIOENCODING'] = 'utf-8'` 否则日志乱码
