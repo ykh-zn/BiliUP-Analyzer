@@ -231,7 +231,7 @@ def fetch_video_list(uid, img_key, sub_key):
             break
 
         pn += 1
-        time.sleep(random.uniform(0.1, 0.2))
+        time.sleep(random.uniform(0.05, 0.1))
 
     return video_list
 
@@ -342,7 +342,7 @@ for idx, video in enumerate(video_list, start=1):
         }
         raw_data_list.append(raw_entry)
 
-        time.sleep(random.uniform(0.1, 0.2))
+        time.sleep(random.uniform(0.05, 0.1))
 
     except Exception as e:
         print(f'第 {idx} 条视频爬取失败: {e}')

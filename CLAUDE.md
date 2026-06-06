@@ -23,11 +23,15 @@ python run_dashboard.py
 - 核心 API：`x/web-interface/view/detail`（一个请求拿到视频详情+Card+标签+相关推荐+评论）
 - WBI 签名：视频列表 API `x/space/wbi/arc/search` 需要 WBI 签名（`mixinKeyEncTab` + MD5）
 - UP 主总播放数通过 `x/space/upstat` API 获取（仅第一个视频时调用一次）
-- 请求间隔 `random.uniform(0.1, 0.2)` 秒
+- 请求间隔 `random.uniform(0.05, 0.1)` 秒
 - 数据输出到 `data/raw/UID_{uid}/` 下三个 JSON 文件
 
-**看板** (`dashboard/app.py`)：
-- Streamlit + Plotly 交互式数据看板，5 个 Tab：数据概览、内容策略、互动分析、生命周期、标签分析
+**看板**（`dashboard/` 目录，4 个模块）：
+- `data.py`（~210 行）— 数据加载/清洗/导出，无 UI 依赖
+- `analysis.py`（~250 行）— 20 个 `analyze_*` 文本分析函数，无 UI 依赖
+- `charts.py`（~400 行）— 21 个 `plot_*` + `generate_wordcloud`，Plotly 全局模板配置（hover 字号 16px）
+- `app.py`（~390 行）— Streamlit UI，import 上面三个模块
+- 5 个 Tab：数据概览、内容策略、互动分析、生命周期、标签分析
 - 支持从看板启动爬虫（subprocess + threading + Queue 实现实时日志）
 - 日志倒序显示（最新在上），15 行，250px 高度
 - 进程中可停止爬取（红色停止按钮）
