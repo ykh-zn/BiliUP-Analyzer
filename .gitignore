@@ -3,6 +3,8 @@ data/cookies.json
 
 # 爬取的原始数据
 data/raw/
+# 保留示例数据
+!data/sample/
 
 # Python
 __pycache__/

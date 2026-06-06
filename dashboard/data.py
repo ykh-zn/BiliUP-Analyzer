@@ -5,6 +5,7 @@ import shutil
 import pandas as pd
 
 RAW_DIR = os.path.join('.', 'data', 'raw')
+SAMPLE_DIR = os.path.join('.', 'data', 'sample')
 
 
 def convert_count(value):
@@ -21,22 +22,25 @@ def convert_count(value):
 
 
 def get_available_uids():
-    """扫描data/raw目录，返回已爬取的(UID, 昵称)列表"""
-    if not os.path.isdir(RAW_DIR):
-        return []
+    """扫描data/raw和data/sample目录，返回已爬取的(UID, 昵称)列表"""
     uids = []
-    for d in os.listdir(RAW_DIR):
-        if d.startswith('UID_'):
-            uid = d[4:]
-            basic_path = os.path.join(RAW_DIR, d, 'basic_data.json')
-            if os.path.exists(basic_path):
-                try:
-                    with open(basic_path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                    nickname = data[0].get('昵称', uid) if data else uid
-                    uids.append((uid, nickname))
-                except:
-                    uids.append((uid, uid))
+    for base_dir in [RAW_DIR, SAMPLE_DIR]:
+        if not os.path.isdir(base_dir):
+            continue
+        for d in os.listdir(base_dir):
+            if d.startswith('UID_'):
+                uid = d[4:]
+                if any(u[0] == uid for u in uids):
+                    continue
+                basic_path = os.path.join(base_dir, d, 'basic_data.json')
+                if os.path.exists(basic_path):
+                    try:
+                        with open(basic_path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        nickname = data[0].get('昵称', uid) if data else uid
+                        uids.append((uid, nickname))
+                    except:
+                        uids.append((uid, uid))
     return uids
 
 
@@ -50,15 +54,15 @@ def delete_uid(uid):
 
 
 def load_basic_data(uid):
-    """加载指定UID的UP主基础信息（昵称、粉丝、获赞等）"""
-    path = os.path.join(RAW_DIR, f'UID_{uid}', 'basic_data.json')
-    if not os.path.exists(path):
-        return None
-    with open(path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    if not data:
-        return None
-    return data[0]
+    """加载指定UID的UP主基础信息（昵称、粉丝、获赞等），优先raw目录，fallback到sample"""
+    for base_dir in [RAW_DIR, SAMPLE_DIR]:
+        path = os.path.join(base_dir, f'UID_{uid}', 'basic_data.json')
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if data:
+                return data[0]
+    return None
 
 
 def parse_duration(dur_str):
@@ -77,12 +81,15 @@ def parse_duration(dur_str):
 
 
 def load_video_data(uid):
-    """加载视频数据JSON，清洗类型，计算互动率等衍生指标"""
-    path = os.path.join(RAW_DIR, f'UID_{uid}', 'video_data.json')
-    if not os.path.exists(path):
-        return None
-    with open(path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+    """加载视频数据JSON，清洗类型，计算互动率等衍生指标，优先raw目录，fallback到sample"""
+    data = None
+    for base_dir in [RAW_DIR, SAMPLE_DIR]:
+        path = os.path.join(base_dir, f'UID_{uid}', 'video_data.json')
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if data:
+                break
     if not data:
         return None
     df = pd.DataFrame(data)

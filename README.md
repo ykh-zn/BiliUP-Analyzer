@@ -49,6 +49,8 @@ pip install -r requirements.txt
 python run_crawler.py --uid <UP主UID>
 ```
 
+> **如何获取UID？** 打开B站，进入任意UP主的空间主页，浏览器地址栏中的数字即为UID。例如 `https://space.bilibili.com/527299525` 中的 `527299525`。
+
 首次运行会自动打开浏览器，扫码登录后 cookies 自动保存，后续无需重复登录。
 
 ### 3. 启动看板
@@ -58,6 +60,8 @@ python run_dashboard.py
 ```
 
 浏览器自动打开看板，选择已有 UP 主查看分析，或输入新 UID 直接爬取。
+
+> **无需爬取也能体验**：仓库内置了示例数据（`data/sample/`），启动看板后可直接选择示例UP主查看分析效果。
 
 ---
 
@@ -74,7 +78,8 @@ BiliUP-Analyzer/
 │   └── charts.py                # 21 个 Plotly 图表函数
 ├── data/
 │   ├── cookies.json             # 登录凭证（已 gitignore）
-│   └── raw/UID_{uid}/           # 爬取数据（已 gitignore）
+│   ├── raw/UID_{uid}/           # 爬取数据（已 gitignore）
+│   └── sample/UID_527299525/    # 示例数据（可直接体验）
 ├── run_crawler.py               # 爬虫入口
 ├── run_dashboard.py             # 看板入口
 └── requirements.txt
