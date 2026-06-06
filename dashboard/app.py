@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 import math
+import shutil
 from collections import Counter
 from itertools import combinations
 from wordcloud import WordCloud
@@ -58,6 +59,14 @@ def get_available_uids():
                 except:
                     uids.append((uid, uid))
     return uids
+
+
+def delete_uid(uid):
+    target = os.path.join(RAW_DIR, f'UID_{uid}')
+    if os.path.isdir(target):
+        shutil.rmtree(target)
+        return True
+    return False
 
 
 def load_basic_data(uid):
@@ -657,7 +666,7 @@ def generate_wordcloud(tags_series):
         return None
     wc = WordCloud(font_path='C:/Windows/Fonts/msyh.ttc', width=800, height=400,
                    background_color='white', max_words=100, colormap='viridis').generate(' '.join(all_tags))
-    fig, ax = plt.subplots(figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(9, 4))
     ax.imshow(wc, interpolation='bilinear')
     ax.axis('off')
     return fig
@@ -677,7 +686,7 @@ def plot_top_tags(df, top_n=20):
     fig = go.Figure(go.Bar(x=list(counts)[::-1], y=list(tags)[::-1],
                            orientation='h', marker_color='#00a1d6'))
     fig.update_layout(title=f'高频标签 Top {top_n}', title_font=TITLE_FONT,
-                      xaxis_title='出现次数', height=500, margin=dict(l=150))
+                      xaxis_title='出现次数', height=430, margin=dict(l=150))
     return fig
 
 
@@ -701,7 +710,7 @@ def plot_tag_impact(df, top_n=10):
     fig.add_trace(go.Bar(x=df_r['标签'], y=df_r['有标签'], name='有该标签', marker_color='#00a1d6'))
     fig.add_trace(go.Bar(x=df_r['标签'], y=df_r['无标签'], name='无该标签', marker_color='#cccccc'))
     fig.update_layout(title=f'Top {top_n} 标签对播放量的影响', title_font=TITLE_FONT,
-                      barmode='group', yaxis_title='平均播放量', height=450)
+                      barmode='group', yaxis_title='平均播放量', height=430)
     return fig
 
 
@@ -723,34 +732,48 @@ def plot_tag_cooccurrence(df, top_n=15):
         filtered = [t for t in tags if t in top_tags_set]
         for a, b in combinations(sorted(set(filtered)), 2):
             pair_count[(a, b)] += 1
-    if not pair_count:
+    filtered_weights = [w for w in pair_count.values() if w >= 2]
+    if not filtered_weights:
         return None
+    tag_counts = Counter(all_tags)
+    max_count = max(tag_counts.values()) if tag_counts else 1
+    max_weight = max(filtered_weights)
+    min_weight = min(filtered_weights)
     node_tags = list(top_tags_set)
     n = len(node_tags)
     angles = [2 * math.pi * i / n for i in range(n)]
     pos = {tag: (math.cos(a), math.sin(a)) for tag, a in zip(node_tags, angles)}
-    tag_counts = Counter(all_tags)
-    max_count = max(tag_counts.values()) if tag_counts else 1
     fig = go.Figure()
     for (a, b), weight in pair_count.items():
-        if weight >= 2:
-            x0, y0 = pos[a]
-            x1, y1 = pos[b]
-            fig.add_trace(go.Scatter(x=[x0, x1, None], y=[y0, y1, None], mode='lines',
-                                     line=dict(width=weight * 0.5, color='rgba(150,150,150,0.5)'),
-                                     hoverinfo='skip', showlegend=False))
+        if weight < 2:
+            continue
+        x0, y0 = pos[a]
+        x1, y1 = pos[b]
+        norm = (weight - min_weight) / (max_weight - min_weight) if max_weight > min_weight else 0.5
+        line_w = 1.5 + norm * 8.5
+        fig.add_trace(go.Scatter(
+            x=[x0, x1, None], y=[y0, y1, None], mode='lines',
+            line=dict(width=line_w, color='rgba(160,160,160,0.6)'),
+            hoverinfo='skip', showlegend=False,
+        ))
     node_x = [pos[t][0] for t in node_tags]
     node_y = [pos[t][1] for t in node_tags]
-    node_size = [max(15, tag_counts[t] / max_count * 50) for t in node_tags]
+    node_size = [max(18, tag_counts[t] / max_count * 70) for t in node_tags]
     fig.add_trace(go.Scatter(
         x=node_x, y=node_y, mode='markers+text',
-        marker=dict(size=node_size, color='#00a1d6', line=dict(width=1, color='white')),
-        text=[t[:6] for t in node_tags], textposition='top center',
-        hovertext=[f'{t} ({tag_counts[t]}次)' for t in node_tags], hoverinfo='text', showlegend=False,
+        marker=dict(size=node_size, color='#00a1d6',
+                    line=dict(width=1.5, color='white')),
+        text=[t[:5] for t in node_tags], textposition='top center',
+        textfont=dict(size=11, color='#333'),
+        hovertext=[f'{t}（{tag_counts[t]}次）' for t in node_tags], hoverinfo='text', showlegend=False,
     ))
     fig.update_layout(title=f'Top {top_n} 标签共现网络', title_font=TITLE_FONT,
-                      xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                      yaxis=dict(showgrid=False, zeroline=False, showticklabels=False), height=550)
+                      xaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                                 range=[-2.0, 2.0]),
+                      yaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                                 range=[-1.3, 1.3]),
+                      hoverlabel=dict(font_size=14),
+                      height=600, plot_bgcolor='white')
     return fig
 
 
@@ -907,8 +930,30 @@ uid_list = get_available_uids()
 uid_options = [f"{nickname} ({uid})" for uid, nickname in uid_list]
 selected_uid = None
 if uid_options:
-    selected = st.sidebar.selectbox("选择已有 UP 主", uid_options)
+    col_sel, col_del = st.sidebar.columns([4, 1])
+    with col_sel:
+        selected = st.selectbox("选择已有 UP 主", uid_options, label_visibility="collapsed")
     selected_uid = selected.split('(')[-1].rstrip(')')
+
+    if 'confirm_delete' not in st.session_state:
+        st.session_state['confirm_delete'] = None
+    with col_del:
+        if st.button("删除", key="delete_uid_btn"):
+            st.session_state['confirm_delete'] = selected_uid
+            st.rerun()
+
+    if st.session_state.get('confirm_delete') == selected_uid:
+        st.sidebar.warning(f"确认删除 UID {selected_uid} 的所有数据？")
+        col_yes, col_no = st.sidebar.columns(2)
+        with col_yes:
+            if st.button("确认", key="confirm_yes", type="primary", use_container_width=True):
+                delete_uid(selected_uid)
+                st.session_state['confirm_delete'] = None
+                st.rerun()
+        with col_no:
+            if st.button("取消", key="confirm_no", use_container_width=True):
+                st.session_state['confirm_delete'] = None
+                st.rerun()
 
 st.sidebar.divider()
 st.sidebar.subheader("爬取新 UP 主")
@@ -1181,7 +1226,9 @@ with tab5:
         st.subheader("标签概览")
         wc_fig = generate_wordcloud(df_tag['标签'])
         if wc_fig:
-            st.pyplot(wc_fig)
+            _, col_wc, _ = st.columns([1, 6, 1])
+            with col_wc:
+                st.pyplot(wc_fig)
         else:
             st.info("无标签数据")
 
