@@ -96,7 +96,7 @@ BiliUP-Analyzer/
 
 ## 截图
 
-> TODO: 添加看板截图
+![数据概览](screenshots/overview.png)
 
 ---
 
