@@ -1,3 +1,4 @@
+import os
 import math
 import pandas as pd
 import numpy as np
@@ -276,7 +277,8 @@ def generate_wordcloud(tags_series):
             all_tags.extend([t.strip() for t in str(tags_str).split(',') if t.strip()])
     if not all_tags:
         return None
-    wc = WordCloud(font_path='C:/Windows/Fonts/msyh.ttc', width=800, height=400,
+    font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'msyh.ttc')
+    wc = WordCloud(font_path=font_path, width=800, height=400,
                    background_color='white', max_words=100, colormap='viridis').generate(' '.join(all_tags))
     fig, ax = plt.subplots(figsize=(9, 4))
     ax.imshow(wc, interpolation='bilinear')
